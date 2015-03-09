@@ -15,8 +15,7 @@ Features
 Usage
 ===============
 
-Serializing An Object
--------
+### Serializing An Object
 
 <pre>
     var def = new Deflater();
@@ -24,8 +23,7 @@ Serializing An Object
     var serializedObject:String = defl.toString();
 </pre>
 
-Deserializing An Object
--------
+### Deserializing An Object
 
 <pre>
     var stm = new StringInflateStream(serializedObject);
@@ -123,7 +121,7 @@ Later, it was decided to add an extra "xp" field to the class, and that there sh
       public var xp:Int;
 
       public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void {
-        if (version < 1) {
+        if (version &lt; 1) {
           // Add new fields to the map
           fieldsMap["name"] = fieldsMap["firstName"] + " " + fieldsMap["lastName"];
           fieldsMap["xp"] = 1;
@@ -136,8 +134,7 @@ Later, it was decided to add an extra "xp" field to the class, and that there sh
 </pre>
 
 
-Limitations
-----
+### Limitations
 
 * Versioning is only supported for classes. Typedefs are not versioned, and will be deserialized exactly as they were serialized.
 * Fields that are removed from a type necessitate a new version and upgrade function that removes the field from the fieldMap.
@@ -146,16 +143,14 @@ Limitations
 * Changing the base class of a type is currently not supported, and will break previously serialized streams.
 
 
-Inheritance
------
+### Inheritance
 
 * For classes using inheritance, all base classes have their own version number. 
 * Each `_upgrade_version` function in the class hierarchy is called once, from the bottom of the class hierarchy to the top, for every class that has a newer version than the serialized version.
 * Note that changing the version number of a base class does not affect the version number of a derived class.
 * Interfaces are not versioned, as they do not affect serialization.
 
-Custom Serialization
------
+### Custom Serialization
 
 The custom serialization methods `hxSerialize` and `hxUnserialize` are supported. Please refer to the [Haxe documentation for information](http://haxe.org/manual/std-serialization.html). Note that **versioning is not supported for these objects**, however.
 
