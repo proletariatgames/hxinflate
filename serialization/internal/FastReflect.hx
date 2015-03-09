@@ -23,6 +23,8 @@
 
 package serialization.internal;
 
+import serialization.internal.TypeUtils;
+
 /**
  *  Faster setProperty API using for precached field name hashes (in C#)
  *  Usage: call/store hash() for property name
@@ -116,7 +118,7 @@ class FastReflect
   }
 
   #if cs
-  static var s_registeredClasses = new Set<TypeKey>();
+  static var s_registeredClasses = new Map<TypeKey, Bool>();
   #end
 
   /** Faster version of Type.createEmptyInstance that caches whether class is a Haxe-generated class. */
@@ -125,7 +127,7 @@ class FastReflect
       var classKey = TypeUtils.keyForClass(cl);
       var isHX = s_registeredClasses.exists(classKey);
       if ( !isHX && untyped __cs__("cl.GetInterface(\"IHxObject\") != null") ) {
-        s_registeredClasses.add(classKey);
+        s_registeredClasses.set(classKey, true);
         isHX = true;
       }
 

@@ -21,15 +21,13 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-package utils;
+package serialization.stream;
 
-import utils.Inflater;
-import model.Result;
 import haxe.io.*;
 import sys.io.*;
 
 /** Implementation of IInflateStream around a haxe file handle */
-class HaxeFileInflateStream implements IInflateStream
+class FileInflateStream implements IInflateStream
 {
   var path:String;
   var stm:FileInput;
@@ -51,16 +49,6 @@ class HaxeFileInflateStream implements IInflateStream
     }
 
     this.stm.seek(offset, SeekBegin);
-  }
-
-  public function readAndDispose() : Result<String> {
-    dispose();
-    try {
-      var s = File.getContent(path);
-      return Success(s);
-    } catch (e:Dynamic) {
-      return Error(Std.string(e));
-    }
   }
 
   public function dispose() : Void {
@@ -92,7 +80,7 @@ class HaxeFileInflateStream implements IInflateStream
   }
 
   public function sub(offset:Int, length:Int) : IInflateStream {
-    return new HaxeFileInflateStream(this.path, this.offset+offset, length);
+    return new FileInflateStream(this.path, this.offset+offset, length);
   }
 
   public function getLength() : Int {

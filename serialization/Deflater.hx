@@ -120,12 +120,12 @@ class Deflater {
 
     See USE_CACHE for a complete description.
   **/
-  var useCache : Bool;
+  public var useCache(default, null) : Bool;
 
   /**
     The individual enum index setting for [this] Deflater instance.
   **/
-  var useEnumIndex : Bool;
+  public var useEnumIndex(default, null) : Bool;
 
   var thash : StringMap<Array<DeflatedClass>>;
   var tcount : Int;
