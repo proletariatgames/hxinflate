@@ -1,0 +1,12 @@
+{
+  "name": "hxInflate",
+  "url": "https://github.com/proletariatgames/hxinflate",
+  "license": "BSD",
+  "tags": ["serialization","loading","saving","storage","database","network"],
+  "description": "Haxe Serialization Library"
+  "version": "0.1.0",
+  "releasenote": "Initial release",
+  "contributors": ["Proletariat, Inc."],
+  "dependencies": {
+  }
+}
