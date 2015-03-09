@@ -1,0 +1,7 @@
+## JavaScript
+-main TestMain
+-lib nodeunit
+-cp test
+
+-js js_test.js
+
