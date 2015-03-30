@@ -4,7 +4,7 @@
   "license": "BSD",
   "tags": ["serialization","loading","saving","storage","database","network"],
   "description": "Haxe Serialization Library",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "releasenote": "Initial release",
   "contributors": ["Proletariat"]
 }
