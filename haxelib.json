@@ -6,7 +6,5 @@
   "description": "Haxe Serialization Library",
   "version": "0.1.0",
   "releasenote": "Initial release",
-  "contributors": ["Proletariat, Inc."],
-  "dependencies": {
-  }
+  "contributors": ["Proletariat, Inc."]
 }
