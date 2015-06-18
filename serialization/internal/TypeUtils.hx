@@ -212,4 +212,15 @@ class TypeUtils
 
     return null;
   }
+
+  public static function getEnumParameters(enm:Enum<Dynamic>, constructor:String) : Array<String> {
+    #if neko
+    #elseif flash9
+    #elseif cpp
+    #elseif php
+    #elseif (java || cs)
+    #else
+    #end
+    return [];
+  }
 }

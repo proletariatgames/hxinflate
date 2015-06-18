@@ -47,10 +47,25 @@ typedef DeflatedClass = {
   potentiallyStale : Bool,
 };
 
+typedef DeflatedEnumValue = {
+  name : String,
+  startParam : Int,
+  numParams : Int,
+};
+
+typedef DeflatedEnum = {
+  index : Int,
+  name : String,
+  version : Int,
+  potentiallyStale : Bool,
+  values : Array<DeflatedEnumValue>,
+};
+
 /* Our Character codes
   "Z" - Deflater Version (first character)
   "V" - Final Type Info
   "W" - Base Type Info
+  "_" - Enum Type Info
   "T" - Index to Type Info in the cache
   "Y" - Raw String
   "R" - Our Raw String ref
@@ -128,7 +143,7 @@ class Deflater {
   **/
   public var useEnumIndex(default, null) : Bool;
 
-  var thash : StringMap<Array<DeflatedClass>>;
+  var thash : StringMap<Array<Dynamic>>;
   var tcount : Int;
   var farray : Array<String>;
 
@@ -283,7 +298,8 @@ class Deflater {
     case TObject:
       serializeObject(v);
     case TEnum(e):
-      serializeEnum(v, e);
+      var info = deflateEnum(v, e);
+      deflateEnumValue(v, info);
     case TFunction:
       throw "Cannot serialize function";
     default:
@@ -522,104 +538,6 @@ class Deflater {
       return;
     buf.add("o");
     serializeFields(v);
-  }
-
-  inline function serializeEnum(v : Dynamic, e : Enum<Dynamic>) : Void {
-    if (!useCache || !serializeRef(v)) {
-      cache.pop();
-      buf.add(useEnumIndex?"j":"w");
-      serializeString(Type.getEnumName(e));
-      #if neko
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(v.index);
-      } else
-        serializeString(new String(v.tag));
-      buf.add(":");
-      if( v.args == null )
-        buf.add(0);
-      else {
-        var l : Int = untyped __dollar__asize(v.args);
-        buf.add(l);
-        for( i in 0...l )
-          serialize(v.args[i]);
-      }
-      #elseif flash9
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(v.index);
-      } else
-        serializeString(v.tag);
-      buf.add(":");
-      var pl : Array<Dynamic> = v.params;
-      if( pl == null )
-        buf.add(0);
-      else {
-        buf.add(pl.length);
-        for( p in pl )
-          serialize(p);
-      }
-      #elseif cpp
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(v.__Index());
-      } else
-        serializeString(v.__Tag());
-      buf.add(":");
-      var pl : Array<Dynamic> = v.__EnumParams();
-      if( pl == null )
-        buf.add(0);
-      else {
-        buf.add(pl.length);
-        for( p in pl )
-          serialize(p);
-      }
-      #elseif php
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(v.index);
-      } else
-        serializeString(v.tag);
-      buf.add(":");
-      var l : Int = untyped __call__("count", v.params);
-      if( l == 0 || v.params == null)
-        buf.add(0);
-      else {
-        buf.add(l);
-        for( i in 0...l )
-          serialize(untyped __field__(v, __php__("params"), i));
-      }
-      #elseif (java || cs)
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(Type.enumIndex(v));
-      } else
-        serializeString(Type.enumConstructor(v));
-      buf.add(":");
-      var arr:Array<Dynamic> = Type.enumParameters(v);
-      if (arr != null)
-      {
-        buf.add(arr.length);
-        for (v in arr)
-          serialize(v);
-      } else {
-        buf.add("0");
-      }
-
-      #else
-      if( useEnumIndex ) {
-        buf.add(":");
-        buf.add(v[1]);
-      } else
-        serializeString(v[0]);
-      buf.add(":");
-      var l = v[untyped "length"];
-      buf.add(l - 2);
-      for( i in 2...l )
-        serialize(v[i]);
-      #end
-      cache.push(v);
-    }
   }
 
   /**
@@ -906,6 +824,130 @@ class Deflater {
         options.stats.set(name, 0);
       }
       options.stats.set(name, options.stats.get(name) + (endPos-startPos));
+    }
+  }
+
+  public function deflateEnum(value : Dynamic, enm:Enum<Dynamic>) : DeflatedEnum {
+    var tdeflater;
+    if ( options.typeDeflater != null ) {
+      // store type info seperately if requested.
+      tdeflater = options.typeDeflater;
+    } else {
+      tdeflater = this;
+    }
+
+    var enumName = Type.getEnumName(enm);
+    var enumVersion = 0;
+
+    var upgradeClassName = '${enumName}_deflatable';
+    var upgradeClass:Class<Dynamic> = Type.resolveClass(upgradeClassName);
+    var di: Dynamic = upgradeClass == null ? null : Reflect.field(upgradeClass, "___deflatable_version");
+    // If it's not currently a Deflatable, it has version 0
+    if (di != null) {
+      enumVersion = Reflect.callMethod(upgradeClass, di, []);
+    }
+
+    var mungedName = mungeClassName(enumName, enumVersion);
+    var types = tdeflater.thash.get(mungedName);
+    var existingInfo:DeflatedEnum = null;
+    if ( types != null ) {
+      // get the most recent typeInfo serialized for this class
+      existingInfo = types[types.length-1];
+      // If it was created from a potentially stale type info, check if it is up-to-date
+      if (existingInfo.potentiallyStale) {
+        // if (!typeDiffersFromDeflatedClass(tdeflater, cls, value, classVersion, options.purpose, existingClass)) {
+        //   existingClass.potentiallyStale = false;
+        // } else {
+        //   // Something changed in the type, but the version wasn't bumped.
+        //   // (This is allowed if the type added a field.)
+        //   // This means we need to store a new type information entry.
+        //   existingClass = null;
+        // }
+      }
+    }
+
+    if (existingInfo != null) {
+      // Only write the index if we need it to identify this instance
+      buf.add("T");
+      buf.add(existingInfo.index);
+      buf.add(":");
+      return existingInfo;
+    }
+
+    var info : DeflatedEnum = {
+      index : tdeflater.tcount++,
+      name : enumName,
+      version : enumVersion,
+      potentiallyStale : false,
+      values : [],
+    };
+
+    if (!tdeflater.thash.exists(mungedName)) {
+      tdeflater.thash.set(mungedName, []);
+    }
+    tdeflater.thash.get(mungedName).push(info);
+
+    tdeflater.buf.add("_");
+    tdeflater.serializeString(info.name);
+    tdeflater.buf.add(":");
+    tdeflater.serialize(info.version);
+    tdeflater.buf.add(":");
+
+    var constructors = Type.getEnumConstructs(enm);
+    tdeflater.serialize(constructors.length);
+    tdeflater.buf.add(":");
+
+    for (constructor in constructors) {
+      tdeflater.serializeString(constructor);
+      tdeflater.buf.add(":");
+
+      var params = TypeUtils.getEnumParameters(enm, constructor);
+      info.values.push({name: constructor, startParam: tdeflater.farray.length, numParams: params.length});
+
+      tdeflater.farray = tdeflater.farray.concat(params);
+      tdeflater.buf.add(params.length);
+      tdeflater.buf.add(":");
+      for (param in params)
+        tdeflater.serializeString(param);
+      tdeflater.buf.add(":");
+    }
+
+    return info;
+  }
+
+  public function deflateEnumValue(v : Dynamic, info : DeflatedEnum) {
+    if (!useCache || !serializeRef(v)) {
+      cache.pop();
+
+      var startPos = 0;
+      if ( options.stats != null ) {
+        startPos = buf.toString().length;
+      }
+
+      var idx = Type.enumIndex(v);
+      var params = Type.enumParameters(v);
+      var numParams = params == null ? 0 : params.length;
+
+      var valueInfo = info.values[idx];
+      if (valueInfo == null || valueInfo.numParams != numParams) {
+        throw 'bad length';
+      }
+
+      serialize(idx);
+      for (x in 0...numParams) {
+        serialize(params[x]);
+      }
+      buf.add("g");
+      cache.push(v);
+
+      if ( options.stats != null ) {
+        var endPos = buf.toString().length;
+        var name = info.name;
+        if ( !options.stats.exists(name) ) {
+          options.stats.set(name, 0);
+        }
+        options.stats.set(name, options.stats.get(name) + (endPos-startPos));
+      }
     }
   }
 }
