@@ -133,7 +133,7 @@ class Inflater {
   var tcache : Array<Dynamic>;
   var fcache : Array<String>;
   var hcache : Array<Int>;
-  var ecache : Map<String, Array<String>>;
+  var ecache : Map<String, InflatedEnum>;
   var skipCounter : Int;
 
   public var purpose(default, null) : String;
@@ -548,37 +548,11 @@ class Inflater {
     }
   }
 
-  function inflateEnumInfo() : InflatedEnum {
-    var info : InflatedEnum = new InflatedEnum();
-    info.name = unserialize();
-    if( stream.readByte() != ":".code ) {
-      throw "Invalid type format (cls)";
-    }
-    info.type = Type.resolveEnum(info.name);
-    info.serialized_version = readDigits();
-    if ( stream.readByte() != ":".code ) {
-      throw "Invalid type format (version)";
-    }
-
-    var numConstructors = readDigits();
-    if( stream.readByte() != ":".code ) {
-      throw "Invalid type format (numConstructors)";
-    }
-    for (f in 0...numConstructors) {
-      var valueInfo : InflatedEnumValue = new InflatedEnumValue();
-      valueInfo.name = unserialize();
-      if( stream.readByte() != ":".code ) {
-        throw "Invalid type format (constructor)";
-      }
-      valueInfo.numParams = readDigits();
-      if( stream.readByte() != ":".code ) {
-        throw "Invalid type format (numParams)";
-      }
-      info.values.push(valueInfo);
-    }
-
-    info.index = tcache.length;
-    tcache.push(info);
+  function setupInflatedEnum(name:String, serialized_version:Int) : InflatedEnum {
+    var info = new InflatedEnum();
+    info.name = name;
+    info.serialized_version = serialized_version;
+    info.type = Type.resolveEnum(name);
 
     if (info.type != null) {
       // See if we need to upgrade this class
@@ -610,23 +584,51 @@ class Inflater {
     return info;
   }
 
+  function inflateEnumInfo() : InflatedEnum {
+    var name = unserialize();
+    if( stream.readByte() != ":".code ) {
+      throw "Invalid type format (cls)";
+    }
+    var serialized_version = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (version)";
+    }
+
+    var info = setupInflatedEnum(name, serialized_version);
+    var numConstructors = readDigits();
+    if( stream.readByte() != ":".code ) {
+      throw "Invalid type format (numConstructors)";
+    }
+    for (f in 0...numConstructors) {
+      var valueInfo : InflatedEnumValue = new InflatedEnumValue();
+      valueInfo.name = unserialize();
+      if( stream.readByte() != ":".code ) {
+        throw "Invalid type format (constructor)";
+      }
+      valueInfo.numParams = readDigits();
+      if( stream.readByte() != ":".code ) {
+        throw "Invalid type format (numParams)";
+      }
+      info.values.push(valueInfo);
+    }
+
+    info.index = tcache.length;
+    tcache.push(info);
+
+    return info;
+  }
+
   function skipEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Void {
     // unserialize each parameter and throw it away.
     this.skipCounter++;
 
     var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
-    if( stream.readByte() != "g".code ) {
-      throw 'Invalid enum data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
-    }
 
     this.skipCounter--;
   }
 
   @:keep inline function inflateEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Dynamic {
     var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
-    if( stream.readByte() != "g".code ) {
-      throw 'Invalid enum data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
-    }
 
     // Upgrade our param array before we construct the enum
     var data = {constructor: valueInfo.name, params: params};
@@ -634,76 +636,76 @@ class Inflater {
       Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [info.serialized_version, data]);
     }
 
-    var o = Type.createEnum(info.type, data.constructor, data.params);
-    cache.push(o);
-    return o;
+    try {
+      return Type.createEnum(info.type, data.constructor, data.params);
+    }
+    catch (e:Dynamic){
+      throw 'Failed to create enum ${info.type}.${data.constructor}(${data.params}) : $e';
+    }
+  }
+
+  inline function unserializeEnumValueCommon(info:InflatedEnum, valueInfo:InflatedEnumValue) : Dynamic {
+    var e = null;
+    if (info.type != null) {
+      e = inflateEnumValue(info, valueInfo);
+    } else if (this.skipCounter > 0 || RemovedTypes.names.exists(info.name)) {
+      skipEnumValue(info, valueInfo);
+    } else {
+      throw 'Missing required code for ${info.name}';
+    }
+    cache.push(e);
+    return e;
   }
 
   inline function unserializeEnumValue() : Dynamic {
     var info = inflateEnum();
     var idx = unserialize();
-    var valueInfo = info.values[idx];
-
-    if (info.type != null) {
-      return inflateEnumValue(info, valueInfo);
-    } else if (this.skipCounter > 0 || RemovedTypes.names.exists(info.name)) {
-      skipEnumValue(info, valueInfo);
-      return null;
-    } else {
-      throw 'Missing required code for ${info.name}';
-      return null;
-    }
+    return unserializeEnumValueCommon(info, info.values[idx]);
   }
 
-  inline function unserializeEnum() : Dynamic {
+  function unserializeOldEnumValue(useIndex:Bool) : Dynamic {
     var name = unserialize();
-    var edecl = Type.resolveEnum(name);
-    if( edecl == null )
-      throw "Enum not found " + name;
-    var e = unserializeEnumImpl(edecl, unserialize());
-    cache.push(e);
-    return e;
-  }
-
-  inline function unserializeEnumByIndex() : Dynamic {
-    var name = unserialize();
-    var edecl = Type.resolveEnum(name);
-    if( edecl == null )
-      throw "Enum not found " + name;
-    stream.readByte(); /* skip ':' */
-    var index = readDigits();
-    var constructs = ecache[name];
-    if (constructs == null) {
-      ecache[name] = constructs = Type.getEnumConstructs(edecl);
-    }
-    var tag = constructs[index];
-    if( tag == null )
-      throw "Unknown enum index "+name+"@"+index;
-    var e = unserializeEnumImpl(edecl, tag);
-    cache.push(e);
-    return e;
-  }
-
-  function unserializeEnumImpl( edecl, tag ) {
-    if( stream.readByte() != ":".code )
-      throw "Invalid enum format";
-    var nargs = readDigits();
-    if( nargs == 0 ) {
-      try {
-        return Type.createEnum(edecl,tag);
-      } catch ( e:Dynamic ) {
-        throw 'Failed to create enum $edecl.$tag: $e';
+    var info = ecache[name];
+    if (info == null) {
+      ecache[name] = info = setupInflatedEnum(name, 0);
+      var constructs = info.type == null ? [] : Type.getEnumConstructs(info.type);
+      for (construct in constructs) {
+        var valueInfo = new InflatedEnumValue();
+        valueInfo.name = construct;
+        valueInfo.numParams = 0;
+        info.values.push(valueInfo);
       }
     }
-    var args = new Array();
-    while( nargs-- > 0 )
-      args.push(unserialize());
-    try {
-      return Type.createEnum(edecl,tag,args);
-    } catch (e:Dynamic) {
-      throw 'Failed to create enum $edecl.$tag(${args.join(",")}) : $e';
-      throw e;
+
+    var valueInfo = null;
+    if (useIndex) {
+      if( stream.readByte() != ":".code ) {
+        throw "Invalid type format (old enum index)";
+      }
+      var index = readDigits();
+      valueInfo = info.values[index];
+      if (valueInfo == null && info.type != null) {
+        throw 'Unknown enum constructor $name@$index';
+      }
     }
+    else {
+      var constructor = unserialize();
+      for (entry in info.values) {
+        if(entry.name == constructor) {
+          valueInfo = entry;
+          break;
+        }
+      }
+      if (valueInfo == null) {
+        valueInfo = new InflatedEnumValue();
+        valueInfo.name = constructor;
+      }
+    }
+
+    if( stream.readByte() != ":".code )
+      throw "Invalid enum format";
+
+    return unserializeEnumValueCommon(info, valueInfo);
   }
 
   inline function unserializeEnumValueMap() : Dynamic {
@@ -995,10 +997,8 @@ class Inflater {
       return unserializeRawStringReference();
     case "x".code:
       throw unserialize();
-    case "w".code:
-      return unserializeEnum();
-    case "j".code:
-      return unserializeEnumByIndex();
+    case "w".code, "j".code:
+      return unserializeOldEnumValue(byte == "j".code);
     case "l".code:
       return unserializeList();
     case "b".code:

@@ -932,7 +932,6 @@ class Deflater {
       for (x in 0...numParams) {
         serialize(params[x]);
       }
-      buf.add("g");
       cache.push(v);
 
       if ( options.stats != null ) {

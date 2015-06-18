@@ -101,7 +101,6 @@ class TestEnumD_deflatable implements Deflatable {
   }
 }
 
-
 class EnumTest {
 
   static function traceBlob(v : Dynamic) : Void {
@@ -116,9 +115,13 @@ class EnumTest {
     test.strictEqual(enumA, inflatedA);
   }
 
-  public static var ENUM_B_VERSION_0 = "ZVER3n_Y9:TestEnumB:0:2:Y7:Value_0:0:Y7:Value_1:1:zg";
-  @test static public function test_upgradeAddParam(test:TestCase) : Void {
-    var upgradedEnumB:TestEnumB = Inflater.run(ENUM_B_VERSION_0);
+  public static var ENUM_B_NO_VERSION = "ZVER3nwY9:TestEnumBY7:Value_0:0";
+  public static var ENUM_B_VERSION_0 = "ZVER3n_Y9:TestEnumB:0:2:Y7:Value_0:0:Y7:Value_1:1:z";
+  @test static public function test_oldAddParam(test:TestCase) : Void { test_addParamHelper(ENUM_B_NO_VERSION, test); }
+  @test static public function test_upgradeAddParam(test:TestCase) : Void { test_addParamHelper(ENUM_B_VERSION_0, test); }
+
+  static public function test_addParamHelper(serialized:String, test:TestCase) : Void {
+    var upgradedEnumB:TestEnumB = Inflater.run(serialized);
     test.ok(upgradedEnumB.match(Value_0(_)));
     switch(upgradedEnumB) {
       case Value_0(added): test.strictEqual(1000, added);
@@ -126,13 +129,13 @@ class EnumTest {
     }
   }
 
-  public static var ENUM_C_VERSION_0 = "ZVER3n_Y9:TestEnumC:0:2:Y7:Value_0:0:Y7:Value_1:1:zg";
+  public static var ENUM_C_VERSION_0 = "ZVER3n_Y9:TestEnumC:0:2:Y7:Value_0:0:Y7:Value_1:1:z";
   @test static public function test_upgradeRenameConstructor(test:TestCase) : Void {
     var upgradedEnumC:TestEnumC = Inflater.run(ENUM_C_VERSION_0);
     test.ok(upgradedEnumC.match(Value_A));
   }
 
-  public static var ENUM_D_VERSION_0 = "ZVER3n_Y9:TestEnumD:0:2:Y7:Value_0:0:Y7:Value_1:1:i1i123g";
+  public static var ENUM_D_VERSION_0 = "ZVER3n_Y9:TestEnumD:0:2:Y7:Value_0:0:Y7:Value_1:1:i1i123";
   @test static public function test_upgradeRemoveParameter(test:TestCase) : Void {
     var upgradedEnumD:TestEnumD = Inflater.run(ENUM_D_VERSION_0);
     test.ok(upgradedEnumD.match(Value_1));
