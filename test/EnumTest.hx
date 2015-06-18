@@ -77,6 +77,30 @@ class TestEnumC_deflatable implements Deflatable {
   }
 }
 
+/*
+// ENUM_D_VERSION_0
+enum TestEnumD {
+  Value_0;
+  Value_1(zero:Int);
+}
+*/
+
+enum TestEnumD {
+  Value_0;
+  Value_1;
+}
+
+@version(1)
+class TestEnumD_deflatable implements Deflatable {
+  public static function _upgrade_enum_version(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
+    if (version < 1) {
+      switch(data.constructor) {
+        case 'Value_1': data.params = null;
+      }
+    }
+  }
+}
+
 
 class EnumTest {
 
@@ -106,6 +130,12 @@ class EnumTest {
   @test static public function test_upgradeRenameConstructor(test:TestCase) : Void {
     var upgradedEnumC:TestEnumC = Inflater.run(ENUM_C_VERSION_0);
     test.ok(upgradedEnumC.match(Value_A));
+  }
+
+  public static var ENUM_D_VERSION_0 = "ZVER3n_Y9:TestEnumD:0:2:Y7:Value_0:0:Y7:Value_1:1:i1i123g";
+  @test static public function test_upgradeRemoveParameter(test:TestCase) : Void {
+    var upgradedEnumD:TestEnumD = Inflater.run(ENUM_D_VERSION_0);
+    test.ok(upgradedEnumD.match(Value_1));
   }
 
 }
