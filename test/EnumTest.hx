@@ -44,7 +44,7 @@ enum TestEnumB {
 
 @version(1)
 class TestEnumB_deflatable implements Deflatable {
-  public static function _upgrade_enum_version(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
+  public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
     if (version < 1) {
       switch(data.constructor) {
         case 'Value_0': data.params = [1000];
@@ -68,7 +68,7 @@ enum TestEnumC {
 
 @version(1)
 class TestEnumC_deflatable implements Deflatable {
-  public static function _upgrade_enum_version(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
+  public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
     if (version < 1) {
       switch(data.constructor) {
         case 'Value_0': data.constructor = 'Value_A';
@@ -92,7 +92,7 @@ enum TestEnumD {
 
 @version(1)
 class TestEnumD_deflatable implements Deflatable {
-  public static function _upgrade_enum_version(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
+  public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
     if (version < 1) {
       switch(data.constructor) {
         case 'Value_1': data.params = null;

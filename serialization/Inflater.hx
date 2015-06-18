@@ -593,7 +593,7 @@ class Inflater {
 
       if (info.serialized_version != currentVersion) {
         // Find the upgrade function we need to call for this class
-        var fnName = '_upgrade_enum_version';
+        var fnName = '_upgrade_enum';
         info.requiresUpgrade = true;
         info.upgradeClass = upgradeClass;
         info.upgradeFunc = upgradeClass == null ? null : Reflect.field(upgradeClass, fnName);
