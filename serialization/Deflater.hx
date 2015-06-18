@@ -245,27 +245,46 @@ class Deflater {
       if (deflater.scount != i_scache.length) {
         throw 'bad length';
       }
-
       for (i in 0...inflater.tcache.length) {
         var type = inflater.tcache[i];
-        var info:DeflatedClass = {
-          name : type.name,
-          index: deflater.tcount++,
-          baseClassIndex : type.baseClassIndex,
-          custom: type.custom,
-          version: type.serialized_version,
-          startField : deflater.farray.length,
-          numFields: type.numFields,
-          potentiallyStale : true,
-        };
-        var mungedName = mungeClassName(type.name, type.serialized_version);
-        if (!deflater.thash.exists(mungedName)) {
-          deflater.thash.set(mungedName, []);
-        }
-        deflater.thash.get(mungedName).push(info);
+        if (Inflater.isEnumTypeInfo(type)) {
+          var values:Array<Dynamic> = type.values;
+          var info:DeflatedEnum = {
+            name : type.name,
+            index: deflater.tcount++,
+            version: type.serialized_version,
+            potentiallyStale : true,
+            values: [for (valueInfo in values) {name: valueInfo.name, numParams: valueInfo.numParams}],
+          };
+          var mungedName = mungeClassName(type.name, type.serialized_version);
+          if (!deflater.thash.exists(mungedName)) {
+            deflater.thash.set(mungedName, []);
+          }
+          deflater.thash.get(mungedName).push(info);
 
-        deflater.buf.add("V");
-        writeClassInfo(deflater, info, inflater.fcache.slice(type.startField, type.startField+type.numFields));
+          deflater.buf.add("_");
+          writeEnumInfo(deflater, info);
+        }
+        else {
+          var info:DeflatedClass = {
+            name : type.name,
+            index: deflater.tcount++,
+            baseClassIndex : type.baseClassIndex,
+            custom: type.custom,
+            version: type.serialized_version,
+            startField : deflater.farray.length,
+            numFields: type.numFields,
+            potentiallyStale : true,
+          };
+          var mungedName = mungeClassName(type.name, type.serialized_version);
+          if (!deflater.thash.exists(mungedName)) {
+            deflater.thash.set(mungedName, []);
+          }
+          deflater.thash.get(mungedName).push(info);
+
+          deflater.buf.add("V");
+          writeClassInfo(deflater, info, inflater.fcache.slice(type.startField, type.startField+type.numFields));
+        }
       }
       if (deflater.tcount != inflater.tcache.length) {
         throw 'bad length';
@@ -887,27 +906,37 @@ class Deflater {
     }
     tdeflater.thash.get(mungedName).push(info);
 
-    tdeflater.buf.add("_");
-    tdeflater.serializeString(info.name);
-    tdeflater.buf.add(":");
-    tdeflater.buf.add(info.version);
-    tdeflater.buf.add(":");
-
     var constructors = Type.getEnumConstructs(enm);
-    tdeflater.buf.add(constructors.length);
-    tdeflater.buf.add(":");
+    info.values = [for (constructor in constructors) {name: constructor, numParams: TypeUtils.getEnumParameterCount(enm, constructor)}];
 
-    for (constructor in constructors) {
-      tdeflater.serializeString(constructor);
-      tdeflater.buf.add(":");
+    writeEnumInfo(tdeflater, info);
 
-      var paramCount = TypeUtils.getEnumParameterCount(enm, constructor);
-      info.values.push({name: constructor, numParams: paramCount});
-      tdeflater.buf.add(paramCount);
-      tdeflater.buf.add(":");
+    if ( options.typeDeflater != null ) {
+      buf.add("-");
+      buf.add(info.index);
+      buf.add(":");
     }
 
     return info;
+  }
+
+  static function writeEnumInfo(target:Deflater, info:DeflatedEnum) : Void {
+    target.buf.add("_");
+    target.serializeString(info.name);
+    target.buf.add(":");
+    target.buf.add(info.version);
+    target.buf.add(":");
+
+    target.buf.add(info.values.length);
+    target.buf.add(":");
+
+    for (valueInfo in info.values) {
+      target.serializeString(valueInfo.name);
+      target.buf.add(":");
+
+      target.buf.add(valueInfo.numParams);
+      target.buf.add(":");
+    }
   }
 
   public function deflateEnumValue(v : Dynamic, info : DeflatedEnum) {

@@ -246,10 +246,14 @@ class Inflater {
         inflater.unserializeRawString();
       case "y".code:
         inflater.unserializeURLEncodedString();
+      case "_".code:
+        inflater.inflateEnumInfo();
       }
     }
     return inflater;
   }
+
+  public static function isEnumTypeInfo(info:Dynamic) : Bool { return Std.is(info, InflatedEnum); }
 
   function inflateClassInfo(lastClassType:Bool) : InflatedClass {
     var info : InflatedClass = new InflatedClass();
