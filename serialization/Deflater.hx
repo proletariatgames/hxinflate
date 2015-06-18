@@ -64,8 +64,9 @@ typedef DeflatedEnum = {
   "Z" - Deflater Version (first character)
   "V" - Final Type Info
   "W" - Base Type Info
-  "_" - Enum Type Info
   "T" - Index to Type Info in the cache
+  "_" - Enum Type Info
+  "-" - Index to Enum Type Info in the cache
   "Y" - Raw String
   "R" - Our Raw String ref
   "S" - no field serialized (Skip)
@@ -867,7 +868,7 @@ class Deflater {
 
     if (existingInfo != null) {
       // Only write the index if we need it to identify this instance
-      buf.add("T");
+      buf.add("-");
       buf.add(existingInfo.index);
       buf.add(":");
       return existingInfo;
