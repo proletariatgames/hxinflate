@@ -49,7 +49,6 @@ typedef DeflatedClass = {
 
 typedef DeflatedEnumValue = {
   name : String,
-  startParam : Int,
   numParams : Int,
 };
 
@@ -901,14 +900,9 @@ class Deflater {
       tdeflater.serializeString(constructor);
       tdeflater.buf.add(":");
 
-      var params = TypeUtils.getEnumParameters(enm, constructor);
-      info.values.push({name: constructor, startParam: tdeflater.farray.length, numParams: params.length});
-
-      tdeflater.farray = tdeflater.farray.concat(params);
-      tdeflater.buf.add(params.length);
-      tdeflater.buf.add(":");
-      for (param in params)
-        tdeflater.serializeString(param);
+      var paramCount = TypeUtils.getEnumParameterCount(enm, constructor);
+      info.values.push({name: constructor, numParams: paramCount});
+      tdeflater.buf.add(paramCount);
       tdeflater.buf.add(":");
     }
 

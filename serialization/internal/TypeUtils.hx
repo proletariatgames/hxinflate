@@ -213,7 +213,7 @@ class TypeUtils
     return null;
   }
 
-  public static function getEnumParameters(enm:Enum<Dynamic>, constructor:String) : Array<String> {
+  public static function getEnumParameterCount(enm:Enum<Dynamic>, constructor:String) : Int {
     #if neko
     #elseif flash9
     #elseif cpp
@@ -221,6 +221,6 @@ class TypeUtils
     #elseif (java || cs)
     #else
     #end
-    return [];
+    return 0;
   }
 }
