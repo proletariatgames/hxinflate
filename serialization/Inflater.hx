@@ -32,10 +32,11 @@ import serialization.internal.FastReflect;
 using StringTools;
 
 typedef InflaterOptions = {
-  ?typeInflater : Inflater
+  ?typeInflater : Inflater,
+  ?skipHeader : Bool,
 };
 
-private class InflatedClass {
+class InflatedClass {
   public var name : String;
   public var type : Class<Dynamic>;
   public var index : Int;
@@ -93,7 +94,6 @@ class Inflater {
   var length : Int;
   var cache : Array<Dynamic>;
   var scache : Array<String>;
-  var purpose : String;
   #if neko
   var upos : Int;
   #end
@@ -103,6 +103,8 @@ class Inflater {
   var hcache : Array<Int>;
   var ecache : Map<String, Array<String>>;
   var skipCounter : Int;
+
+  public var purpose(default, null) : String;
   public var entities : Array<Dynamic>;
 
   // The code for skipping would conflict with floats ("E").
@@ -140,15 +142,19 @@ class Inflater {
     }
     entities = [];
 
-    // Look up our version at the top of the buffer
-    var prevPos = stream.getPos();
-    var code = stream.readString(Deflater.VERSION_CODE.length);
-    if (code == Deflater.VERSION_CODE) {
-      this.deflaterVersion = readDigits();
+    if (opt != null && opt.skipHeader) {
+      this.deflaterVersion = Deflater.VERSION;
     } else {
-      this.stream.seekTo(prevPos);
-      // Version 0 is from before we serialized our version
-      this.deflaterVersion = 0;
+      // Look up our version at the top of the buffer
+      var prevPos = stream.getPos();
+      var code = stream.readString(Deflater.VERSION_CODE.length);
+      if (code == Deflater.VERSION_CODE) {
+        this.deflaterVersion = readDigits();
+      } else {
+        this.stream.seekTo(prevPos);
+        // Version 0 is from before we serialized our version
+        this.deflaterVersion = 0;
+      }
     }
 
     if (opt != null && opt.typeInflater != null && opt.typeInflater.deflaterVersion != this.deflaterVersion) {
@@ -539,7 +545,7 @@ class Inflater {
     try {
       return Type.createEnum(edecl,tag,args);
     } catch (e:Dynamic) {
-      throw 'Failed to create enum $edecl.$tag(${args.join(",")})';
+      throw 'Failed to create enum $edecl.$tag(${args.join(",")}) : $e';
       throw e;
     }
   }

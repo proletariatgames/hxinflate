@@ -33,6 +33,7 @@ typedef DeflaterOptions = {
   ?stats : haxe.ds.StringMap<Int>,
   ?useEnumIndex : Bool,
   ?useCache : Bool,
+  ?skipHeader : Bool,
 };
 
 typedef DeflatedClass = {
@@ -101,7 +102,7 @@ class Deflater {
   3 - Change Skip code from E to S (fixes overload with float exp)
   */
   public static inline var VERSION_CODE = "ZVER";
-  static inline var VERSION : Int = 3;
+  public static inline var VERSION : Int = 3;
 
   var buf : StringBuf;
   var cache : Array<Dynamic>;
@@ -159,8 +160,10 @@ class Deflater {
     options.stats = opt != null ? opt.stats : null;
 
     // Write our version at the top of the buffer
-    buf.add(VERSION_CODE);
-    buf.add(VERSION);
+    if (opt == null || !opt.skipHeader) {
+      buf.add(VERSION_CODE);
+      buf.add(VERSION);
+    }
 
     // Write the "purpose" string in our deflater options
     serialize(options.purpose);
