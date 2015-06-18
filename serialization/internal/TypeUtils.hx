@@ -219,6 +219,13 @@ class TypeUtils
     #elseif cpp
     #elseif php
     #elseif (java || cs)
+    #elseif js
+      var f = Reflect.field(enm,constructor);
+      if( f == null ) throw 'No such constructor $enm.$constructor';
+      if( Reflect.isFunction(f) ) {
+        return f.length;
+      }
+      return 0;
     #else
     #end
     return 0;
