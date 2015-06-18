@@ -555,7 +555,7 @@ class Inflater {
       throw "Invalid type format (cls)";
     }
     info.type = Type.resolveEnum(info.name);
-    info.serialized_version = unserialize();
+    info.serialized_version = readDigits();
     if ( stream.readByte() != ":".code ) {
       throw "Invalid type format (version)";
     }
@@ -594,6 +594,7 @@ class Inflater {
       if (info.serialized_version != currentVersion) {
         // Find the upgrade function we need to call for this class
         var fnName = '_upgrade_enum_version';
+        info.requiresUpgrade = true;
         info.upgradeClass = upgradeClass;
         info.upgradeFunc = upgradeClass == null ? null : Reflect.field(upgradeClass, fnName);
         if (info.upgradeFunc == null) {
@@ -615,7 +616,7 @@ class Inflater {
 
     var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
     if( stream.readByte() != "g".code ) {
-      throw 'Invalid class data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
+      throw 'Invalid enum data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
     }
 
     this.skipCounter--;
@@ -624,22 +625,23 @@ class Inflater {
   @:keep inline function inflateEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Dynamic {
     var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
     if( stream.readByte() != "g".code ) {
-      throw 'Invalid class data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
+      throw 'Invalid enum data for instance of ${info.name} at pos ${stream.getPos()-1} in buf $stream';
     }
 
     // Upgrade our param array before we construct the enum
+    var data = {constructor: valueInfo.name, params: params};
     if (info.requiresUpgrade) {
-      Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [valueInfo.name, info.serialized_version, params]);
+      Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [info.serialized_version, data]);
     }
 
-    var o = Type.createEnum(info.type, valueInfo.name, params);
+    var o = Type.createEnum(info.type, data.constructor, data.params);
     cache.push(o);
     return o;
   }
 
   inline function unserializeEnumValue() : Dynamic {
     var info = inflateEnum();
-    var idx = readDigits();
+    var idx = unserialize();
     var valueInfo = info.values[idx];
 
     if (info.type != null) {

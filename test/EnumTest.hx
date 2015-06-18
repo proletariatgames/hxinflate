@@ -102,7 +102,7 @@ class EnumTest {
     }
   }
 
-  public static var ENUM_C_VERSION_0 = "ZVER3n_Y9:TestEnumB:0:2:Y7:Value_0:0:Y7:Value_1:1:zg";
+  public static var ENUM_C_VERSION_0 = "ZVER3n_Y9:TestEnumC:0:2:Y7:Value_0:0:Y7:Value_1:1:zg";
   @test static public function test_upgradeRenameConstructor(test:TestCase) : Void {
     var upgradedEnumC:TestEnumC = Inflater.run(ENUM_C_VERSION_0);
     test.ok(upgradedEnumC.match(Value_A));

@@ -890,11 +890,11 @@ class Deflater {
     tdeflater.buf.add("_");
     tdeflater.serializeString(info.name);
     tdeflater.buf.add(":");
-    tdeflater.serialize(info.version);
+    tdeflater.buf.add(info.version);
     tdeflater.buf.add(":");
 
     var constructors = Type.getEnumConstructs(enm);
-    tdeflater.serialize(constructors.length);
+    tdeflater.buf.add(constructors.length);
     tdeflater.buf.add(":");
 
     for (constructor in constructors) {
