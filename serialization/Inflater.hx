@@ -701,6 +701,7 @@ class Inflater {
     if( stream.readByte() != ":".code )
       throw "Invalid enum format";
 
+    valueInfo.numParams = readDigits();
     return unserializeEnumValueCommon(info, valueInfo);
   }
 
