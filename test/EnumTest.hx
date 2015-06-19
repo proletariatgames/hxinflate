@@ -101,6 +101,29 @@ class TestEnumD_deflatable implements Deflatable {
   }
 }
 
+/*
+// ENUM_E_VERSION_0
+enum TestEnumE {
+  Value_0;
+  Value_1(zero:Int);
+}
+*/
+
+enum TestEnumE {
+  Value_0;
+}
+
+@version(1)
+class TestEnumE_deflatable implements Deflatable {
+  public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) {
+    if (version < 1) {
+      switch(data.constructor) {
+        case 'Value_1': data.constructor = null;
+      }
+    }
+  }
+}
+
 class EnumTest {
 
   static function traceBlob(v : Dynamic) : Void {
@@ -141,4 +164,9 @@ class EnumTest {
     test.ok(upgradedEnumD.match(Value_1));
   }
 
+  public static var ENUM_E_VERSION_0 = "ZVER3n|Y9:TestEnumE:0:f:=Y7:Value_1:0:1:0:i1i123";
+  @test static public function test_upgradeRemoveConstructor(test:TestCase) : Void {
+    var upgradedEnumE:TestEnumE = Inflater.run(ENUM_E_VERSION_0);
+    test.strictEqual(upgradedEnumE, null);
+  }
 }

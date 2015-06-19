@@ -688,7 +688,7 @@ class Inflater {
       }
 
       try {
-        e = Type.createEnum(info.type, data.constructor, data.params);
+        e = data.constructor == null ? null : Type.createEnum(info.type, data.constructor, data.params);
       }
       catch (e:Dynamic){
         throw 'Failed to create enum ${info.name}.${data.constructor}(${data.params}) : $e';
