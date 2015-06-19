@@ -52,12 +52,14 @@ typedef DeflatedEnum = {
   index : Int,
   name : String,
   version : Int,
+  useIndex : Bool,
   potentiallyStale : Bool,
 };
 
 typedef DeflatedEnumValue = {
   index : Int,
-  name : String,
+  typeIndex : Int,
+  constructor : String,
   enumIndex : Int,
   numParams : Int,
 };
@@ -67,9 +69,9 @@ typedef DeflatedEnumValue = {
   "V" - Final Type Info
   "W" - Base Type Info
   "T" - Index to Type Info in the cache
-  "-" - Enum Type Info
-  "+" - Enum Value Type Info
-  "_" - Index to Enum Type Info in the cache
+  "|" - Enum Type Info
+  "=" - Enum Value Type Info
+  "_" - Index to Enum Value Type Info in the cache
   "#" - Index to Enum Value Type Info in the cache
   "Y" - Raw String
   "R" - Our Raw String ref
@@ -257,30 +259,29 @@ class Deflater {
             index: deflater.tcount++,
             version: type.serialized_version,
             potentiallyStale : true,
+            useIndex: type.useIndex,
           };
           var mungedName = mungeClassName(type.name, type.serialized_version);
           if (!deflater.thash.exists(mungedName)) {
             deflater.thash.set(mungedName, []);
           }
           deflater.thash.get(mungedName).push(info);
-
-          deflater.buf.add("_");
           writeEnumInfo(deflater, info);
         }
         else if (Std.is(type, InflatedEnumValue)) {
+          var enumType = type.enumType;
           var info:DeflatedEnumValue = {
-            name : type.name,
+            constructor : type.construct,
             index: deflater.tcount++,
             numParams: type.numParams,
-            enumIndex: type.enm.index,
+            enumIndex: type.enumIndex,
+            typeIndex: enumType.index,
           };
-          var mungedName = mungeClassName(type.enm.name, type.enm.serialized_version) + '::${type.name}';
+          var mungedName = mungeClassName(enumType.name, enumType.serialized_version) + '::${type.construct}';
           if (!deflater.thash.exists(mungedName)) {
             deflater.thash.set(mungedName, []);
           }
           deflater.thash.get(mungedName).push(info);
-
-          deflater.buf.add("#");
           writeEnumValueInfo(deflater, info);
         }
         else {
@@ -335,9 +336,8 @@ class Deflater {
     case TObject:
       serializeObject(v);
     case TEnum(e):
-      var info = deflateEnum(v, e);
-      var valueInfo = deflateEnumValue(v, e, info);
-      deflateEnumValueInstance(v, info, valueInfo);
+      var valueInfo = deflateEnum(v, e);
+      deflateEnumValue(v, valueInfo);
     case TFunction:
       throw "Cannot serialize function";
     default:
@@ -865,7 +865,7 @@ class Deflater {
     }
   }
 
-  function deflateEnum(value : Dynamic, enm:Enum<Dynamic>) : DeflatedEnum {
+  function deflateEnum(value : Dynamic, enm:Enum<Dynamic>) : DeflatedEnumValue {
     var tdeflater = options.typeDeflater != null ? options.typeDeflater : this;
 
     var enumName = Type.getEnumName(enm);
@@ -879,8 +879,21 @@ class Deflater {
       enumVersion = Reflect.callMethod(upgradeClass, di, []);
     }
 
-    var mungedName = mungeClassName(enumName, enumVersion);
-    var types = tdeflater.thash.get(mungedName);
+    var constructor = Type.enumConstructor(value);
+    var mungedEnumName = mungeClassName(enumName, enumVersion);
+    var mungedValueName = '$mungedEnumName::$constructor';
+    var types = tdeflater.thash.get(mungedValueName);
+    var existingValueInfo:DeflatedEnumValue = types != null ? types[types.length-1] : null;
+    if (existingValueInfo != null) {
+      // Only write the index if we need it to identify this instance
+      buf.add("_");
+      buf.add(existingValueInfo.index);
+      buf.add(":");
+      return existingValueInfo;
+    }
+
+    // lookup the enum type info
+    types = tdeflater.thash.get(mungedEnumName);
     var existingInfo:DeflatedEnum = null;
     if ( types != null ) {
       // get the most recent typeInfo serialized for this class
@@ -898,86 +911,55 @@ class Deflater {
       }
     }
 
-    if (existingInfo != null) {
-      // Only write the index if we need it to identify this instance
-      buf.add("_");
-      buf.add(existingInfo.index);
-      buf.add(":");
-      return existingInfo;
+    if (existingInfo == null) {
+      var info : DeflatedEnum = existingInfo = {
+        index : tdeflater.tcount++,
+        name : enumName,
+        version : enumVersion,
+        useIndex : this.useEnumIndex,
+        potentiallyStale : false,
+      };
+
+      if (!tdeflater.thash.exists(mungedEnumName)) {
+        tdeflater.thash.set(mungedEnumName, []);
+      }
+      tdeflater.thash.get(mungedEnumName).push(info);
+
+      writeEnumInfo(tdeflater, info);
     }
 
-    var info : DeflatedEnum = {
+    var info : DeflatedEnumValue = {
       index : tdeflater.tcount++,
-      name : enumName,
-      version : enumVersion,
-      potentiallyStale : false,
+      typeIndex : existingInfo.index,
+      constructor : existingInfo.useIndex ? null : constructor,
+      enumIndex : Type.enumIndex(value),
+      numParams : TypeUtils.getEnumParameterCount(enm, constructor),
     };
-
-    if (!tdeflater.thash.exists(mungedName)) {
-      tdeflater.thash.set(mungedName, []);
+    if (!tdeflater.thash.exists(mungedValueName)) {
+      tdeflater.thash.set(mungedValueName, []);
     }
-    tdeflater.thash.get(mungedName).push(info);
+    tdeflater.thash.get(mungedValueName).push(info);
 
-    writeEnumInfo(tdeflater, info);
-
-    if ( options.typeDeflater != null ) {
-      buf.add("_");
-      buf.add(info.index);
-      buf.add(":");
-    }
+    writeEnumValueInfo(tdeflater, info);
 
     return info;
   }
 
   static function writeEnumInfo(target:Deflater, info:DeflatedEnum) : Void {
-    target.buf.add("-");
+    target.buf.add("|");
     target.serializeString(info.name);
     target.buf.add(":");
     target.buf.add(info.version);
     target.buf.add(":");
-  }
-
-  public function deflateEnumValue(v : Dynamic, e : Enum<Dynamic>, info : DeflatedEnum) {
-
-    var tdeflater = options.typeDeflater != null ? options.typeDeflater : this;
-    var constructor = Type.enumConstructor(v);
-    var mungedName = mungeClassName(info.name, info.version) + '::$constructor';
-    var types = tdeflater.thash.get(mungedName);
-    var existingInfo:DeflatedEnumValue = types != null ? types[types.length-1] : null;
-
-    if (existingInfo != null) {
-      // Only write the index if we need it to identify this instance
-      buf.add("#");
-      buf.add(existingInfo.index);
-      buf.add(":");
-      return existingInfo;
-    }
-
-    var info : DeflatedEnumValue = {
-      index : tdeflater.tcount++,
-      name : constructor,
-      enumIndex : info.index,
-      numParams : TypeUtils.getEnumParameterCount(e, constructor),
-    };
-
-    if (!tdeflater.thash.exists(mungedName)) {
-      tdeflater.thash.set(mungedName, []);
-    }
-    tdeflater.thash.get(mungedName).push(info);
-
-    writeEnumValueInfo(tdeflater, info);
-
-    if ( options.typeDeflater != null ) {
-      buf.add("#");
-      buf.add(info.index);
-      buf.add(":");
-    }
-    return info;
+    target.serialize(info.useIndex);
+    target.buf.add(":");
   }
 
   static function writeEnumValueInfo(target:Deflater, info:DeflatedEnumValue) : Void {
-    target.buf.add("+");
-    target.serializeString(info.name);
+    target.buf.add("=");
+    target.serialize(info.constructor);
+    target.buf.add(":");
+    target.buf.add(info.typeIndex);
     target.buf.add(":");
     target.buf.add(info.enumIndex);
     target.buf.add(":");
@@ -985,14 +967,9 @@ class Deflater {
     target.buf.add(":");
   }
 
-  public function deflateEnumValueInstance(v : Dynamic, info:DeflatedEnum, valueInfo : DeflatedEnumValue) {
+  public function deflateEnumValue(v : Dynamic, valueInfo : DeflatedEnumValue) {
     if (!useCache || !serializeRef(v)) {
       cache.pop();
-
-      var startPos = 0;
-      if ( options.stats != null ) {
-        startPos = buf.toString().length;
-      }
 
       var params = Type.enumParameters(v);
       var numParams = params == null ? 0 : params.length;
@@ -1004,15 +981,6 @@ class Deflater {
         serialize(params[x]);
       }
       cache.push(v);
-
-      if ( options.stats != null ) {
-        var endPos = buf.toString().length;
-        var name = info.name;
-        if ( !options.stats.exists(name) ) {
-          options.stats.set(name, 0);
-        }
-        options.stats.set(name, options.stats.get(name) + (endPos-startPos));
-      }
     }
   }
 }
