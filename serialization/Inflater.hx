@@ -67,7 +67,7 @@ class InflatedClass {
   }
 }
 
-private class InflatedEnumValue {
+class InflatedEnumValue {
   public var name : String;
   public var numParams : Int;
 
@@ -77,9 +77,10 @@ private class InflatedEnumValue {
   }
 }
 
-private class InflatedEnum {
+class InflatedEnum {
   public var name : String;
   public var type : Enum<Dynamic>;
+  public var index : Int;
   public var serialized_version : Int;
   public var upgradeFunc : Dynamic;
   public var upgradeClass : Class<Dynamic>;
@@ -89,6 +90,7 @@ private class InflatedEnum {
   public function new() {
     this.name = null;
     this.type = null;
+    this.index = -1;
     this.serialized_version = -1;
     this.upgradeFunc = null;
     this.upgradeClass = null;
@@ -614,6 +616,7 @@ class Inflater {
       info.values.push(valueInfo);
     }
 
+    info.index = tcache.length;
     tcache.push(info);
     return info;
   }
