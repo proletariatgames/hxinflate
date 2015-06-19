@@ -72,7 +72,6 @@ typedef DeflatedEnumValue = {
   "|" - Enum Type Info
   "=" - Enum Value Type Info
   "_" - Index to Enum Value Type Info in the cache
-  "#" - Index to Enum Value Type Info in the cache
   "Y" - Raw String
   "R" - Our Raw String ref
   "S" - no field serialized (Skip)

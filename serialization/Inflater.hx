@@ -647,15 +647,6 @@ class Inflater {
     return valueInfo;
   }
 
-  function skipEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Void {
-    // unserialize each parameter and throw it away.
-    this.skipCounter++;
-
-    var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
-
-    this.skipCounter--;
-  }
-
   @:keep function inflateEnumValue(valueInfo : InflatedEnumValue) : Dynamic {
 
     var info = valueInfo.enumType;
@@ -667,7 +658,6 @@ class Inflater {
     } else {
       throw 'Missing required code for ${info.name}';
     }
-
 
     var e = null;
     if (skip) this.skipCounter++;
