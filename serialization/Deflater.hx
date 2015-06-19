@@ -962,7 +962,7 @@ class Deflater {
     info.typeIndex = existingInfo.index;
     info.construct = existingInfo.useIndex ? null : constructor;
     info.enumIndex = Type.enumIndex(value);
-    info.numParams = TypeUtils.getEnumParameterCount(enm, constructor);
+    info.numParams = TypeUtils.getEnumParameterCount(enm, value);
 
     if (!tdeflater.thash.exists(mungedValueName)) {
       tdeflater.thash.set(mungedValueName, []);
