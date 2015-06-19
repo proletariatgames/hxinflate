@@ -69,6 +69,8 @@ class InflatedClass {
 
 class InflatedEnumValue {
   public var name : String;
+  public var index : Int;
+  public var enm : InflatedEnum;
   public var numParams : Int;
 
   public function new() {
@@ -85,7 +87,6 @@ class InflatedEnum {
   public var upgradeFunc : Dynamic;
   public var upgradeClass : Class<Dynamic>;
   public var requiresUpgrade : Bool;
-  public var values : Array<InflatedEnumValue>;
 
   public function new() {
     this.name = null;
@@ -95,7 +96,6 @@ class InflatedEnum {
     this.upgradeFunc = null;
     this.upgradeClass = null;
     this.requiresUpgrade = false;
-    this.values = [];
   }
 }
 
@@ -133,7 +133,7 @@ class Inflater {
   var tcache : Array<Dynamic>;
   var fcache : Array<String>;
   var hcache : Array<Int>;
-  var ecache : Map<String, InflatedEnum>;
+  var ecache : Map<String, {info:InflatedEnum, values:Array<InflatedEnumValue>}>;
   var skipCounter : Int;
 
   public var purpose(default, null) : String;
@@ -248,14 +248,14 @@ class Inflater {
         inflater.unserializeRawString();
       case "y".code:
         inflater.unserializeURLEncodedString();
-      case "_".code:
+      case "-".code:
         inflater.inflateEnumInfo();
+      case "+".code:
+        inflater.inflateEnumValueInfo();
       }
     }
     return inflater;
   }
-
-  public static function isEnumTypeInfo(info:Dynamic) : Bool { return Std.is(info, InflatedEnum); }
 
   function inflateClassInfo(lastClassType:Bool) : InflatedClass {
     var info : InflatedClass = new InflatedClass();
@@ -540,15 +540,32 @@ class Inflater {
     default:
       throw "Invalid enum type";
       return null;
-    case "-".code:
+    case "_".code:
       var t = readDigits();
       if( t < 0 || t >= tcache.length )
         throw "Invalid enum type reference";
       if( stream.readByte() != ":".code )
         throw "Invalid enum type reference format";
       return tcache[t];
-    case "_".code:
+    case "-".code:
       return inflateEnumInfo();
+    }
+  }
+
+  public function inflateEnumValue() : InflatedEnumValue {
+    switch( stream.readByte() ) {
+    default:
+      throw "Invalid enum type";
+      return null;
+    case "#".code:
+      var t = readDigits();
+      if( t < 0 || t >= tcache.length )
+        throw "Invalid enum type reference";
+      if( stream.readByte() != ":".code )
+        throw "Invalid enum type reference format";
+      return tcache[t];
+    case "+".code:
+      return inflateEnumValueInfo();
     }
   }
 
@@ -591,35 +608,42 @@ class Inflater {
   function inflateEnumInfo() : InflatedEnum {
     var name = unserialize();
     if( stream.readByte() != ":".code ) {
-      throw "Invalid type format (cls)";
+      throw "Invalid type format (enum name)";
     }
     var serialized_version = readDigits();
     if ( stream.readByte() != ":".code ) {
-      throw "Invalid type format (version)";
+      throw "Invalid type format (enum version)";
     }
 
     var info = setupInflatedEnum(name, serialized_version);
-    var numConstructors = readDigits();
-    if( stream.readByte() != ":".code ) {
-      throw "Invalid type format (numConstructors)";
-    }
-    for (f in 0...numConstructors) {
-      var valueInfo : InflatedEnumValue = new InflatedEnumValue();
-      valueInfo.name = unserialize();
-      if( stream.readByte() != ":".code ) {
-        throw "Invalid type format (constructor)";
-      }
-      valueInfo.numParams = readDigits();
-      if( stream.readByte() != ":".code ) {
-        throw "Invalid type format (numParams)";
-      }
-      info.values.push(valueInfo);
-    }
-
     info.index = tcache.length;
     tcache.push(info);
     return info;
   }
+
+  function inflateEnumValueInfo() : InflatedEnumValue {
+    var name = unserialize();
+    if( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum value name)";
+    }
+    var enum_index = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum value type)";
+    }
+    var num_params = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum value num params)";
+    }
+
+    var valueInfo : InflatedEnumValue = new InflatedEnumValue();
+    valueInfo.name = name;
+    valueInfo.numParams = num_params;
+    valueInfo.enm = tcache[enum_index];
+    valueInfo.index = tcache.length;
+    tcache.push(valueInfo);
+    return valueInfo;
+  }
+
 
   function skipEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Void {
     // unserialize each parameter and throw it away.
@@ -630,31 +654,38 @@ class Inflater {
     this.skipCounter--;
   }
 
-  @:keep inline function inflateEnumValue(info : InflatedEnum, valueInfo : InflatedEnumValue) : Dynamic {
-    var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
+  @:keep inline function inflateEnumValueInstance(info : InflatedEnum, valueInfo : InflatedEnumValue) : Dynamic {
 
-    // Upgrade our param array before we construct the enum
-    var data = {constructor: valueInfo.name, params: params};
-    if (info.requiresUpgrade) {
-      Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [info.serialized_version, data]);
-    }
-
-    try {
-      return Type.createEnum(info.type, data.constructor, data.params);
-    }
-    catch (e:Dynamic){
-      throw 'Failed to create enum ${info.type}.${data.constructor}(${data.params}) : $e';
-    }
-  }
-
-  inline function unserializeEnumValueCommon(info:InflatedEnum, valueInfo:InflatedEnumValue) : Dynamic {
-    var e = null;
+    var skip = false;
     if (info.type != null) {
-      e = inflateEnumValue(info, valueInfo);
+      skip = false;
     } else if (this.skipCounter > 0 || RemovedTypes.names.exists(info.name)) {
-      skipEnumValue(info, valueInfo);
+      skip = true;
     } else {
       throw 'Missing required code for ${info.name}';
+    }
+
+
+    var e = null;
+    if (skip) this.skipCounter++;
+
+    var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
+
+    if (skip) { this.skipCounter--; }
+    else {
+
+      // Upgrade our param array before we construct the enum
+      var data = {constructor: valueInfo.name, params: params};
+      if (info.requiresUpgrade) {
+        Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [info.serialized_version, data]);
+      }
+
+      try {
+        e = Type.createEnum(info.type, data.constructor, data.params);
+      }
+      catch (e:Dynamic){
+        throw 'Failed to create enum ${info.type}.${data.constructor}(${data.params}) : $e';
+      }
     }
     cache.push(e);
     return e;
@@ -662,22 +693,24 @@ class Inflater {
 
   inline function unserializeEnumValue() : Dynamic {
     var info = inflateEnum();
-    var idx = unserialize();
-    return unserializeEnumValueCommon(info, info.values[idx]);
+    var valueInfo = inflateEnumValue();
+    return inflateEnumValueInstance(info, valueInfo);
   }
 
   function unserializeOldEnumValue(useIndex:Bool) : Dynamic {
     var name = unserialize();
-    var info = ecache[name];
-    if (info == null) {
-      ecache[name] = info = setupInflatedEnum(name, 0);
+    var cached : {info:InflatedEnum, values:Array<InflatedEnumValue>} = ecache[name];
+    if (cached == null) {
+      var info = setupInflatedEnum(name, 0);
+      var values = [];
       var constructs = info.type == null ? [] : Type.getEnumConstructs(info.type);
       for (construct in constructs) {
         var valueInfo = new InflatedEnumValue();
         valueInfo.name = construct;
         valueInfo.numParams = 0;
-        info.values.push(valueInfo);
+        values.push(valueInfo);
       }
+      ecache[name] = cached = {info: info, values: values};
     }
 
     var valueInfo = null;
@@ -686,14 +719,14 @@ class Inflater {
         throw "Invalid type format (old enum index)";
       }
       var index = readDigits();
-      valueInfo = info.values[index];
-      if (valueInfo == null && info.type != null) {
+      valueInfo = cached.values[index];
+      if (valueInfo == null && cached.info.type != null) {
         throw 'Unknown enum constructor $name@$index';
       }
     }
     else {
       var constructor = unserialize();
-      for (entry in info.values) {
+      for (entry in cached.values) {
         if(entry.name == constructor) {
           valueInfo = entry;
           break;
@@ -709,7 +742,7 @@ class Inflater {
       throw "Invalid enum format";
 
     valueInfo.numParams = readDigits();
-    return unserializeEnumValueCommon(info, valueInfo);
+    return inflateEnumValueInstance(cached.info, valueInfo);
   }
 
   inline function unserializeEnumValueMap() : Dynamic {

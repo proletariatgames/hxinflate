@@ -26,6 +26,7 @@ package serialization;
 import haxe.ds.StringMap;
 import serialization.internal.TypeUtils;
 import serialization.stream.StringInflateStream;
+import serialization.Inflater;
 
 typedef DeflaterOptions = {
   ?purpose : String,
@@ -47,17 +48,18 @@ typedef DeflatedClass = {
   potentiallyStale : Bool,
 };
 
-typedef DeflatedEnumValue = {
-  name : String,
-  numParams : Int,
-};
-
 typedef DeflatedEnum = {
   index : Int,
   name : String,
   version : Int,
   potentiallyStale : Bool,
-  values : Array<DeflatedEnumValue>,
+};
+
+typedef DeflatedEnumValue = {
+  index : Int,
+  name : String,
+  enumIndex : Int,
+  numParams : Int,
 };
 
 /* Our Character codes
@@ -65,8 +67,10 @@ typedef DeflatedEnum = {
   "V" - Final Type Info
   "W" - Base Type Info
   "T" - Index to Type Info in the cache
-  "_" - Enum Type Info
-  "-" - Index to Enum Type Info in the cache
+  "-" - Enum Type Info
+  "+" - Enum Value Type Info
+  "_" - Index to Enum Type Info in the cache
+  "#" - Index to Enum Value Type Info in the cache
   "Y" - Raw String
   "R" - Our Raw String ref
   "S" - no field serialized (Skip)
@@ -247,14 +251,12 @@ class Deflater {
       }
       for (i in 0...inflater.tcache.length) {
         var type = inflater.tcache[i];
-        if (Inflater.isEnumTypeInfo(type)) {
-          var values:Array<Dynamic> = type.values;
+        if (Std.is(type, serialization.InflatedEnum)) {
           var info:DeflatedEnum = {
             name : type.name,
             index: deflater.tcount++,
             version: type.serialized_version,
             potentiallyStale : true,
-            values: [for (valueInfo in values) {name: valueInfo.name, numParams: valueInfo.numParams}],
           };
           var mungedName = mungeClassName(type.name, type.serialized_version);
           if (!deflater.thash.exists(mungedName)) {
@@ -264,6 +266,22 @@ class Deflater {
 
           deflater.buf.add("_");
           writeEnumInfo(deflater, info);
+        }
+        else if (Std.is(type, InflatedEnumValue)) {
+          var info:DeflatedEnumValue = {
+            name : type.name,
+            index: deflater.tcount++,
+            numParams: type.numParams,
+            enumIndex: type.enm.index,
+          };
+          var mungedName = mungeClassName(type.enm.name, type.enm.serialized_version) + '::${type.name}';
+          if (!deflater.thash.exists(mungedName)) {
+            deflater.thash.set(mungedName, []);
+          }
+          deflater.thash.get(mungedName).push(info);
+
+          deflater.buf.add("#");
+          writeEnumValueInfo(deflater, info);
         }
         else {
           var info:DeflatedClass = {
@@ -318,7 +336,8 @@ class Deflater {
       serializeObject(v);
     case TEnum(e):
       var info = deflateEnum(v, e);
-      deflateEnumValue(v, info);
+      var valueInfo = deflateEnumValue(v, e, info);
+      deflateEnumValueInstance(v, info, valueInfo);
     case TFunction:
       throw "Cannot serialize function";
     default:
@@ -846,14 +865,8 @@ class Deflater {
     }
   }
 
-  public function deflateEnum(value : Dynamic, enm:Enum<Dynamic>) : DeflatedEnum {
-    var tdeflater;
-    if ( options.typeDeflater != null ) {
-      // store type info seperately if requested.
-      tdeflater = options.typeDeflater;
-    } else {
-      tdeflater = this;
-    }
+  function deflateEnum(value : Dynamic, enm:Enum<Dynamic>) : DeflatedEnum {
+    var tdeflater = options.typeDeflater != null ? options.typeDeflater : this;
 
     var enumName = Type.getEnumName(enm);
     var enumVersion = 0;
@@ -887,7 +900,7 @@ class Deflater {
 
     if (existingInfo != null) {
       // Only write the index if we need it to identify this instance
-      buf.add("-");
+      buf.add("_");
       buf.add(existingInfo.index);
       buf.add(":");
       return existingInfo;
@@ -898,7 +911,6 @@ class Deflater {
       name : enumName,
       version : enumVersion,
       potentiallyStale : false,
-      values : [],
     };
 
     if (!tdeflater.thash.exists(mungedName)) {
@@ -906,13 +918,10 @@ class Deflater {
     }
     tdeflater.thash.get(mungedName).push(info);
 
-    var constructors = Type.getEnumConstructs(enm);
-    info.values = [for (constructor in constructors) {name: constructor, numParams: TypeUtils.getEnumParameterCount(enm, constructor)}];
-
     writeEnumInfo(tdeflater, info);
 
     if ( options.typeDeflater != null ) {
-      buf.add("-");
+      buf.add("_");
       buf.add(info.index);
       buf.add(":");
     }
@@ -921,25 +930,62 @@ class Deflater {
   }
 
   static function writeEnumInfo(target:Deflater, info:DeflatedEnum) : Void {
-    target.buf.add("_");
+    target.buf.add("-");
     target.serializeString(info.name);
     target.buf.add(":");
     target.buf.add(info.version);
     target.buf.add(":");
-
-    target.buf.add(info.values.length);
-    target.buf.add(":");
-
-    for (valueInfo in info.values) {
-      target.serializeString(valueInfo.name);
-      target.buf.add(":");
-
-      target.buf.add(valueInfo.numParams);
-      target.buf.add(":");
-    }
   }
 
-  public function deflateEnumValue(v : Dynamic, info : DeflatedEnum) {
+  public function deflateEnumValue(v : Dynamic, e : Enum<Dynamic>, info : DeflatedEnum) {
+
+    var tdeflater = options.typeDeflater != null ? options.typeDeflater : this;
+    var constructor = Type.enumConstructor(v);
+    var mungedName = mungeClassName(info.name, info.version) + '::$constructor';
+    var types = tdeflater.thash.get(mungedName);
+    var existingInfo:DeflatedEnumValue = types != null ? types[types.length-1] : null;
+
+    if (existingInfo != null) {
+      // Only write the index if we need it to identify this instance
+      buf.add("#");
+      buf.add(existingInfo.index);
+      buf.add(":");
+      return existingInfo;
+    }
+
+    var info : DeflatedEnumValue = {
+      index : tdeflater.tcount++,
+      name : constructor,
+      enumIndex : info.index,
+      numParams : TypeUtils.getEnumParameterCount(e, constructor),
+    };
+
+    if (!tdeflater.thash.exists(mungedName)) {
+      tdeflater.thash.set(mungedName, []);
+    }
+    tdeflater.thash.get(mungedName).push(info);
+
+    writeEnumValueInfo(tdeflater, info);
+
+    if ( options.typeDeflater != null ) {
+      buf.add("#");
+      buf.add(info.index);
+      buf.add(":");
+    }
+    return info;
+  }
+
+  static function writeEnumValueInfo(target:Deflater, info:DeflatedEnumValue) : Void {
+    target.buf.add("+");
+    target.serializeString(info.name);
+    target.buf.add(":");
+    target.buf.add(info.enumIndex);
+    target.buf.add(":");
+    target.buf.add(info.numParams);
+    target.buf.add(":");
+  }
+
+  public function deflateEnumValueInstance(v : Dynamic, info:DeflatedEnum, valueInfo : DeflatedEnumValue) {
     if (!useCache || !serializeRef(v)) {
       cache.pop();
 
@@ -948,16 +994,12 @@ class Deflater {
         startPos = buf.toString().length;
       }
 
-      var idx = Type.enumIndex(v);
       var params = Type.enumParameters(v);
       var numParams = params == null ? 0 : params.length;
-
-      var valueInfo = info.values[idx];
       if (valueInfo == null || valueInfo.numParams != numParams) {
         throw 'bad length';
       }
 
-      serialize(idx);
       for (x in 0...numParams) {
         serialize(params[x]);
       }
