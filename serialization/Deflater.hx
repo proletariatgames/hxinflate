@@ -941,6 +941,11 @@ class Deflater {
 
     writeEnumValueInfo(tdeflater, info);
 
+    if ( options.typeDeflater != null ) {
+      buf.add("_");
+      buf.add(info.index);
+      buf.add(":");
+    }
     return info;
   }
 
