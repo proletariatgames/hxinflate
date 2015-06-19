@@ -88,6 +88,8 @@ If this function returns false, the specified field will not be serialized.
 Versioning
 ===============
 
+### Versioning An Object
+
 Classes can be versioned, so that classes with added/removed fields can still be constructed from serialized data created pre-modification.
 
 All serialized class instances include a version number, which is zero (0) by default. When fields are added removed from a class, you can increment the version number of a class and supply an upgrade function as follows:
@@ -133,13 +135,58 @@ Later, it was decided to add an extra "xp" field to the class, and that there sh
     }
 </pre>
 
+### Versioning An Enum
+
+Enums can be versioned, so that you can rename constructors or change the number of parameters for a given constructor and enum instances can still be constructed from serialized data created pre-modification.
+
+All serialized enum types include a version number, which is zero (0) by default. When constructors change, you can increment the version number of an enum and supply an upgrade function as follows:
+
+1. Create a class in the same package named '${enumName}_deflatable'. Ensure the class implements `serialization.Deflatable`
+2. Add a `@version` metadata to the class, specifying the current version number
+3. Add a static `_upgrade_enum function`, with the following signature:
+
+<pre>
+    public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) : Void;
+</pre>
+
+- `version` is the version of the enum *at the time it was serialized*.
+- `data` is a typedef with two fields:
+  - `constructor` is the name of the enum constructor when this value was serialized
+  - `params` is an array of parameters that this value contained when it was serialized
+
+For example, imagine the following enum was originally written, and instances have been serialized to a database.
+
+<pre>
+    enum PVPOpponent {
+      AI;
+      Human;
+    }
+</pre>
+
+Later, it was decided to add an extra "name" parameter to the Human type, and that the AI constructor should be renamed to Computer. The following modifications can be done with a new class that allows be able to deserialize old instances:
+
+<pre>
+    @version(1) @:keep class PVPOpponent_deflatable implements serialization.Deflatable {
+      public static function _upgrade_enum(version:Int, , data:{constructor:String, params:Array<Dynamic>) : Void {
+        if (version &lt; 1) {
+          switch(data.constructor) {
+          // rename the old constructor
+          case 'AI': data.constructor = 'Computer';
+
+          // add a new default parameter
+          case 'Human': data.params = ['Bob'];
+          }
+        }
+      }
+    }
+</pre>
 
 ### Limitations
 
-* Versioning is only supported for classes. Typedefs are not versioned, and will be deserialized exactly as they were serialized.
+* Versioning is only supported for classes and enums. Typedefs are not versioned, and will be deserialized exactly as they were serialized.
 * Fields that are removed from a type necessitate a new version and upgrade function that removes the field from the fieldMap.
-* If a class is deleted, you must call `RemovedTypes.add(className)` before attempting to inflate a stream that may include that class. Removed classes will simply deserialize as `null`. Otherwise, if a class no longer exists, Inflater will throw an exception.
-* Versioning is not currently supported for enums. New enum values can be added, but values cannot be removed from an `enum` definition without breaking serialized streams that include that value. If a serialized enum value no longer exists, Inflater will throw an exception.
+* Constructors that are removed from an enum necessitate a new version and upgrade function that sets the constructor to null. This will cause an error for @:nativeGen enums
+* If a class or enum is deleted, you must call `RemovedTypes.add(typeName)` before attempting to inflate a stream that may include that type. Removed instances will simply deserialize as `null`. Otherwise, if a type no longer exists, Inflater will throw an exception.
 * Changing the base class of a type is currently not supported, and will break previously serialized streams.
 
 

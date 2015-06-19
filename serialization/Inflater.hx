@@ -37,10 +37,16 @@ typedef InflaterOptions = {
   ?skipHeader : Bool,
 };
 
-class InflatedClass {
+class InflatedType {
+  public var index : Int;
+  public function new() {
+    this.index = -1;
+  }
+}
+
+class InflatedClass extends InflatedType {
   public var name : String;
   public var type : Class<Dynamic>;
-  public var index : Int;
   public var baseClassIndex : Int;
   public var custom : Bool;
   public var serialized_version : Int;
@@ -54,9 +60,9 @@ class InflatedClass {
   #end
 
   public function new() {
+    super();
     this.name = null;
     this.type = null;
-    this.index = -1;
     this.baseClassIndex = -1;
     this.custom = false;
     this.serialized_version = -1;
@@ -65,6 +71,42 @@ class InflatedClass {
     this.classUpgrade = null;
     this.requiresUpgrade = false;
     this.hasPostUnserialize = -1;
+  }
+}
+
+class InflatedEnumValue extends InflatedType {
+  public var construct : String;
+  public var enumIndex : Int;
+  public var enumType : InflatedEnum;
+  public var numParams : Int;
+
+  public function new() {
+    super();
+    this.construct = null;
+    this.enumIndex = -1;
+    this.enumType = null;
+    this.numParams = 0;
+  }
+}
+
+class InflatedEnum extends InflatedType {
+  public var name : String;
+  public var type : Enum<Dynamic>;
+  public var serialized_version : Int;
+  public var upgradeFunc : Dynamic;
+  public var upgradeClass : Class<Dynamic>;
+  public var requiresUpgrade : Bool;
+  public var useIndex : Bool;
+
+  public function new() {
+    super();
+    this.name = null;
+    this.type = null;
+    this.serialized_version = -1;
+    this.upgradeFunc = null;
+    this.upgradeClass = null;
+    this.requiresUpgrade = false;
+    this.useIndex = false;
   }
 }
 
@@ -101,10 +143,10 @@ class Inflater {
   #end
 
   var typeInflater : Inflater;
-  var tcache : Array<InflatedClass>;
+  var tcache : Array<InflatedType>;
   var fcache : Array<String>;
   var hcache : Array<Int>;
-  var ecache : Map<String, Array<String>>;
+  var ecache : Map<String, {info:InflatedEnum, values:Array<InflatedEnumValue>}>;
   var skipCounter : Int;
 
   public var purpose(default, null) : String;
@@ -197,7 +239,7 @@ class Inflater {
       if (classIndex == -1) {
         break;
       }
-      var inflatedClass = tcache[classIndex];
+      var inflatedClass:InflatedClass = cast tcache[classIndex];
       if (inflatedClass.type == cls) {
         return inflatedClass.serialized_version;
       }
@@ -225,6 +267,10 @@ class Inflater {
       case '!'.code, '#'.code, '~'.code:
         stream.seekTo(stream.getPos()-1);
         inflater.rtree.unserialize(inflater, true);
+      case "|".code:
+        inflater.inflateEnumInfo();
+      case "=".code:
+        inflater.inflateEnumValueInfo();
       default:
         throw 'unexpected code in typeinfo';
       }
@@ -335,7 +381,7 @@ class Inflater {
         if (hierarchyInfo.baseClassIndex == -1) {
           break;
         }
-        hierarchyInfo = tcache[hierarchyInfo.baseClassIndex];
+        hierarchyInfo = cast tcache[hierarchyInfo.baseClassIndex];
       }
 
       // Populate the info with a cache of fields that belong to the current version of this class
@@ -375,7 +421,7 @@ class Inflater {
         throw "Invalid type reference";
       if( stream.readByte() != ":".code )
         throw "Invalid type reference format";
-      return tcache[t];
+      return cast tcache[t];
     case "V".code:
       return inflateClassInfo(true);
     case "W".code:
@@ -489,7 +535,7 @@ class Inflater {
   function upgradeFieldMap(o:Dynamic, fieldMap:Map<String, Dynamic>, info:InflatedClass) : Void {
     // First upgrade the fields on any base classes
     if (info.baseClassIndex != -1) {
-      upgradeFieldMap(o, fieldMap, tcache[info.baseClassIndex]);
+      upgradeFieldMap(o, fieldMap, cast tcache[info.baseClassIndex]);
     }
     if (info.classUpgrade != null) {
       Reflect.callMethod(info.type, info.classUpgrade, [o, info.serialized_version, fieldMap]);
@@ -510,55 +556,213 @@ class Inflater {
     }
   }
 
-  inline function unserializeEnum() : Dynamic {
-    var name = unserialize();
-    var edecl = Type.resolveEnum(name);
-    if( edecl == null )
-      throw "Enum not found " + name;
-    var e = unserializeEnumImpl(edecl, unserialize());
-    cache.push(e);
-    return e;
-  }
-
-  inline function unserializeEnumByIndex() : Dynamic {
-    var name = unserialize();
-    var edecl = Type.resolveEnum(name);
-    if( edecl == null )
-      throw "Enum not found " + name;
-    stream.readByte(); /* skip ':' */
-    var index = readDigits();
-    var constructs = ecache[name];
-    if (constructs == null) {
-      ecache[name] = constructs = Type.getEnumConstructs(edecl);
+  public function inflateEnum() : InflatedEnumValue {
+    var b = stream.readByte();
+    switch( b ) {
+    default:
+      throw 'Invalid enum type: $b';
+      return null;
+    case "_".code:
+      var t = readDigits();
+      if( t < 0 || t >= tcache.length )
+        throw "Invalid enum type reference";
+      if( stream.readByte() != ":".code )
+        throw "Invalid enum type reference format";
+      return cast tcache[t];
+    case "=".code:
+      return inflateEnumValueInfo();
+    case "|".code:
+      inflateEnumInfo();
+      return inflateEnum();
     }
-    var tag = constructs[index];
-    if( tag == null )
-      throw "Unknown enum index "+name+"@"+index;
-    var e = unserializeEnumImpl(edecl, tag);
-    cache.push(e);
-    return e;
   }
 
-  function unserializeEnumImpl( edecl, tag ) {
-    if( stream.readByte() != ":".code )
-      throw "Invalid enum format";
-    var nargs = readDigits();
-    if( nargs == 0 ) {
-      try {
-        return Type.createEnum(edecl,tag);
-      } catch ( e:Dynamic ) {
-        throw 'Failed to create enum $edecl.$tag: $e';
+  function setupInflatedEnum(name:String, serialized_version:Int) : InflatedEnum {
+    var info = new InflatedEnum();
+    info.name = name;
+    info.serialized_version = serialized_version;
+    info.type = Type.resolveEnum(name);
+
+    if (info.type != null) {
+      // See if we need to upgrade this class
+      var currentVersion = 0;
+      var upgradeClassName = '${info.name}_deflatable';
+      var upgradeClass:Class<Dynamic> = Type.resolveClass(upgradeClassName);
+      var di: Dynamic = upgradeClass == null ? null : Reflect.field(upgradeClass, "___deflatable_version");
+      // If it's not currently a Deflatable, it has version 0
+      if (di != null) {
+        currentVersion = Reflect.callMethod(upgradeClass, di, []);
+      }
+
+      if (info.serialized_version != currentVersion) {
+        // Find the upgrade function we need to call for this class
+        var fnName = '_upgrade_enum';
+        info.requiresUpgrade = true;
+        info.upgradeClass = upgradeClass;
+        info.upgradeFunc = upgradeClass == null ? null : Reflect.field(upgradeClass, fnName);
+        if (info.upgradeFunc == null) {
+          throw 'Please implement ${fnName} for class ${upgradeClassName}, need to upgrade from version ${info.serialized_version}';
+        }
+      }
+    } else {
+      if (this.skipCounter == 0 && !RemovedTypes.names.exists(info.name)) {
+        throw 'Enum not found ${info.name}';
       }
     }
-    var args = new Array();
-    while( nargs-- > 0 )
-      args.push(unserialize());
-    try {
-      return Type.createEnum(edecl,tag,args);
-    } catch (e:Dynamic) {
-      throw 'Failed to create enum $edecl.$tag(${args.join(",")}) : $e';
-      throw e;
+
+    return info;
+  }
+
+  function inflateEnumInfo() : InflatedEnum {
+    var name = unserialize();
+    if( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum name)";
     }
+    var serialized_version = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum version)";
+    }
+    var use_index = unserialize();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum use index)";
+    }
+
+    var info = setupInflatedEnum(name, serialized_version);
+    info.useIndex = use_index;
+    info.index = tcache.length;
+    tcache.push(info);
+    return info;
+  }
+
+  function inflateEnumValueInfo() : InflatedEnumValue {
+    var constructor = unserialize();
+    if( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum constructor)";
+    }
+    var type_index = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum type index)";
+    }
+    var enum_index = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum index)";
+    }
+    var num_params = readDigits();
+    if ( stream.readByte() != ":".code ) {
+      throw "Invalid type format (enum num params)";
+    }
+
+    var valueInfo : InflatedEnumValue = new InflatedEnumValue();
+    valueInfo.construct = constructor;
+    valueInfo.enumIndex = enum_index;
+    valueInfo.enumType = cast tcache[type_index];
+    valueInfo.numParams = num_params;
+    valueInfo.index = tcache.length;
+    tcache.push(valueInfo);
+    return valueInfo;
+  }
+
+  @:keep function inflateEnumValue(valueInfo : InflatedEnumValue) : Dynamic {
+
+    var info = valueInfo.enumType;
+    var skip = false;
+    if (info.type != null) {
+      skip = false;
+    } else if (this.skipCounter > 0 || RemovedTypes.names.exists(info.name)) {
+      skip = true;
+    } else {
+      throw 'Missing required code for ${info.name}';
+    }
+
+    var e = null;
+    if (skip) this.skipCounter++;
+
+    var params = valueInfo.numParams == 0 ? null : [for (i in 0...valueInfo.numParams) unserialize()];
+
+    if (skip) { this.skipCounter--; }
+    else if (info.useIndex) {
+      if (info.requiresUpgrade) {
+        throw 'Cannot currently upgrade a useEnumIndex enum ${info.name}';
+      }
+      try {
+        e = Type.createEnumIndex(info.type, valueInfo.enumIndex, params);
+      }
+      catch (e:Dynamic){
+        throw 'Failed to create enum ${info.name}@${valueInfo.enumIndex}(${params}) : $e';
+      }
+    }
+    else {
+      // Upgrade our param array before we construct the enum
+      var data = {constructor: valueInfo.construct, params: params};
+      if (info.requiresUpgrade) {
+        Reflect.callMethod(info.upgradeClass, info.upgradeFunc, [info.serialized_version, data]);
+      }
+
+      try {
+        e = data.constructor == null ? null : Type.createEnum(info.type, data.constructor, data.params);
+      }
+      catch (e:Dynamic){
+        throw 'Failed to create enum ${info.name}.${data.constructor}(${data.params}) : $e';
+      }
+    }
+    cache.push(e);
+    return e;
+  }
+
+  inline function unserializeEnumValue() : Dynamic {
+    var valueInfo = inflateEnum();
+    return inflateEnumValue(valueInfo);
+  }
+
+  function unserializeOldEnumValue(useIndex:Bool) : Dynamic {
+    var name = unserialize();
+    var cached : {info:InflatedEnum, values:Array<InflatedEnumValue>} = ecache[name];
+    if (cached == null) {
+      var info = setupInflatedEnum(name, 0);
+      var values = [];
+      var constructs = info.type == null ? [] : Type.getEnumConstructs(info.type);
+      for (i in 0...constructs.length) {
+        var valueInfo = new InflatedEnumValue();
+        valueInfo.construct = constructs[i];
+        valueInfo.enumIndex = i;
+        valueInfo.enumType = info;
+        valueInfo.numParams = 0;
+        values.push(valueInfo);
+      }
+      ecache[name] = cached = {info: info, values: values};
+    }
+
+    var valueInfo = null;
+    if (useIndex) {
+      if( stream.readByte() != ":".code ) {
+        throw "Invalid type format (old enum index)";
+      }
+      var index = readDigits();
+      valueInfo = cached.values[index];
+      if (valueInfo == null && cached.info.type != null) {
+        throw 'Unknown enum constructor $name@$index';
+      }
+    }
+    else {
+      var constructor = unserialize();
+      for (entry in cached.values) {
+        if(entry.construct == constructor) {
+          valueInfo = entry;
+          break;
+        }
+      }
+      if (valueInfo == null) {
+        valueInfo = new InflatedEnumValue();
+        valueInfo.construct = constructor;
+        valueInfo.enumType = cached.info;
+      }
+    }
+
+    if( stream.readByte() != ":".code )
+      throw "Invalid enum format";
+
+    valueInfo.numParams = readDigits();
+    return inflateEnumValue(valueInfo);
   }
 
   inline function unserializeEnumValueMap() : Dynamic {
@@ -817,6 +1021,9 @@ class Inflater {
       // radix-tree serialized strings
       stream.seekTo(stream.getPos()-1);
       return rtree.unserialize(this, typeInflater == null);
+    case "|".code, "=".code, "_".code:
+      stream.seekTo(stream.getPos()-1);
+      return unserializeEnumValue();
     case "Y".code: // raw string
       return unserializeRawString();
     case "N".code:
@@ -851,10 +1058,8 @@ class Inflater {
       return unserializeRawStringReference();
     case "x".code:
       throw unserialize();
-    case "w".code:
-      return unserializeEnum();
-    case "j".code:
-      return unserializeEnumByIndex();
+    case "w".code, "j".code:
+      return unserializeOldEnumValue(byte == "j".code);
     case "l".code:
       return unserializeList();
     case "b".code:
@@ -884,23 +1089,5 @@ class Inflater {
   **/
   public static function run( v : String, ?options:InflaterOptions ) : Dynamic {
     return new Inflater(new StringInflateStream(v), options).unserialize();
-  }
-
-  public function getStrings(set:Map<String, Bool>, filter:String->Bool) : Void {
-    for (v in this.scache.filter(filter)) {
-      set[v] = true;
-    }
-  }
-
-  public function getTypes(set:Map<String, Bool>) : Void {
-    for (type in this.tcache) {
-      set[type.name] = true;
-    }
-  }
-
-  public function getFields(set:Map<String, Bool>) : Void {
-    for (f in this.fcache) {
-      set[f] = true;
-    }
   }
 }
