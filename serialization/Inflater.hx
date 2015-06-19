@@ -1075,22 +1075,4 @@ class Inflater {
   public static function run( v : String, ?options:InflaterOptions ) : Dynamic {
     return new Inflater(new StringInflateStream(v), options).unserialize();
   }
-
-  public function getStrings(set:Map<String, Bool>, filter:String->Bool) : Void {
-    for (v in this.scache.filter(filter)) {
-      set[v] = true;
-    }
-  }
-
-  public function getTypes(set:Map<String, Bool>) : Void {
-    for (type in this.tcache) {
-      set[type.name] = true;
-    }
-  }
-
-  public function getFields(set:Map<String, Bool>) : Void {
-    for (f in this.fcache) {
-      set[f] = true;
-    }
-  }
 }
