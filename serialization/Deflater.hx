@@ -84,14 +84,12 @@ class DeflatedEnumValue extends DeflatedType {
 class DeflatedEnum extends DeflatedType {
   public var name : String;
   public var version : Int;
-  public var potentiallyStale : Bool;
   public var useIndex : Bool;
 
   public function new() {
     super();
     this.name = null;
     this.version = -1;
-    this.potentiallyStale = false;
     this.useIndex = false;
   }
 }
@@ -289,7 +287,6 @@ class Deflater {
           info.name = type.name;
           info.index = deflater.tcount++;
           info.version = type.serialized_version;
-          info.potentiallyStale = true;
           info.useIndex = type.useIndex;
 
           var mungedName = mungeClassName(type.name, type.serialized_version);
@@ -924,30 +921,13 @@ class Deflater {
 
     // lookup the enum type info
     types = tdeflater.thash.get(mungedEnumName);
-    var existingInfo:DeflatedEnum = null;
-    if ( types != null ) {
-      // get the most recent typeInfo serialized for this class
-      existingInfo = cast types[types.length-1];
-      // If it was created from a potentially stale type info, check if it is up-to-date
-      if (existingInfo.potentiallyStale) {
-        // if (!typeDiffersFromDeflatedClass(tdeflater, cls, value, classVersion, options.purpose, existingClass)) {
-        //   existingClass.potentiallyStale = false;
-        // } else {
-        //   // Something changed in the type, but the version wasn't bumped.
-        //   // (This is allowed if the type added a field.)
-        //   // This means we need to store a new type information entry.
-        //   existingClass = null;
-        // }
-      }
-    }
-
+    var existingInfo:DeflatedEnum = types != null ? cast types[types.length-1] : null;
     if (existingInfo == null) {
       var info = existingInfo = new DeflatedEnum();
       info.index = tdeflater.tcount++;
       info.name = enumName;
       info.version = enumVersion;
       info.useIndex = this.useEnumIndex;
-      info.potentiallyStale = false;
 
       if (!tdeflater.thash.exists(mungedEnumName)) {
         tdeflater.thash.set(mungedEnumName, []);
