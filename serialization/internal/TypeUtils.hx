@@ -212,4 +212,24 @@ class TypeUtils
 
     return null;
   }
+
+  public static function getEnumParameterCount(e:Enum<Dynamic>, v : Dynamic) : Int {
+    #if neko   
+      return v.args == null ? 0 : untyped __dollar__asize(v.args);
+    #elseif flash9   
+      return v.params == null ? 0 : pl.length;
+    #elseif cpp    
+      var pl : Array<Dynamic> = v.__EnumParams();
+      return pl == null ? 0 : pl.length;
+    #elseif php    
+      var l : Int = untyped __call__("count", v.params);   
+      return l == 0 || v.params == null ? 0 : l;
+    #elseif (java || cs)   
+      var arr:Array<Dynamic> = Type.enumParameters(v);
+      return arr == null ? 0 : arr.length;
+    #else    
+      var l = v[untyped "length"];
+      return l - 2;
+    #end
+  }
 }

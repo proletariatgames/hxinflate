@@ -26,6 +26,6 @@ class TestSuite extends nodeunit.TestSuite {
     super();
     add(DeflatableTest);
     add(SerializationTest);
-    add(TypeUtilsTest);
+    add(EnumTest);
   }
 }
