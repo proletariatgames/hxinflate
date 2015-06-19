@@ -36,10 +36,16 @@ typedef InflaterOptions = {
   ?skipHeader : Bool,
 };
 
-class InflatedClass {
+class InflatedType {
+  public var index : Int;
+  public function new() {
+    this.index = -1;
+  }
+}
+
+class InflatedClass extends InflatedType {
   public var name : String;
   public var type : Class<Dynamic>;
-  public var index : Int;
   public var baseClassIndex : Int;
   public var custom : Bool;
   public var serialized_version : Int;
@@ -53,9 +59,9 @@ class InflatedClass {
   #end
 
   public function new() {
+    super();
     this.name = null;
     this.type = null;
-    this.index = -1;
     this.baseClassIndex = -1;
     this.custom = false;
     this.serialized_version = -1;
@@ -67,26 +73,24 @@ class InflatedClass {
   }
 }
 
-class InflatedEnumValue {
+class InflatedEnumValue extends InflatedType {
   public var construct : String;
   public var enumIndex : Int;
   public var enumType : InflatedEnum;
   public var numParams : Int;
-  public var index : Int;
 
   public function new() {
+    super();
     this.construct = null;
     this.enumIndex = -1;
     this.enumType = null;
     this.numParams = 0;
-    this.index = -1;
   }
 }
 
-class InflatedEnum {
+class InflatedEnum extends InflatedType {
   public var name : String;
   public var type : Enum<Dynamic>;
-  public var index : Int;
   public var serialized_version : Int;
   public var upgradeFunc : Dynamic;
   public var upgradeClass : Class<Dynamic>;
@@ -94,9 +98,9 @@ class InflatedEnum {
   public var useIndex : Bool;
 
   public function new() {
+    super();
     this.name = null;
     this.type = null;
-    this.index = -1;
     this.serialized_version = -1;
     this.upgradeFunc = null;
     this.upgradeClass = null;

@@ -37,32 +37,64 @@ typedef DeflaterOptions = {
   ?skipHeader : Bool,
 };
 
-typedef DeflatedClass = {
-  index : Int,
-  baseClassIndex : Int,
-  name : String,
-  custom : Bool,
-  version : Int,
-  startField : Int,
-  numFields : Int,
-  potentiallyStale : Bool,
-};
 
-typedef DeflatedEnum = {
-  index : Int,
-  name : String,
-  version : Int,
-  useIndex : Bool,
-  potentiallyStale : Bool,
-};
+class DeflatedType {
+  public var index : Int;
+  public function new() {
+    this.index = -1;
+  }
+}
 
-typedef DeflatedEnumValue = {
-  index : Int,
-  typeIndex : Int,
-  constructor : String,
-  enumIndex : Int,
-  numParams : Int,
-};
+class DeflatedClass extends DeflatedType {
+  public var name : String;
+  public var baseClassIndex : Int;
+  public var custom : Bool;
+  public var version : Int;
+  public var startField : Int;
+  public var numFields : Int;
+  public var potentiallyStale : Bool;
+
+  public function new() {
+    super();
+    this.name = null;
+    this.baseClassIndex = -1;
+    this.custom = false;
+    this.version = -1;
+    this.startField = 0;
+    this.numFields = 0;
+    this.potentiallyStale = false;
+  }
+}
+
+class DeflatedEnumValue extends DeflatedType {
+  public var construct : String;
+  public var enumIndex : Int;
+  public var typeIndex : Int;
+  public var numParams : Int;
+
+  public function new() {
+    super();
+    this.construct = null;
+    this.enumIndex = -1;
+    this.typeIndex = -1;
+    this.numParams = 0;
+  }
+}
+
+class DeflatedEnum extends DeflatedType {
+  public var name : String;
+  public var version : Int;
+  public var potentiallyStale : Bool;
+  public var useIndex : Bool;
+
+  public function new() {
+    super();
+    this.name = null;
+    this.version = -1;
+    this.potentiallyStale = false;
+    this.useIndex = false;
+  }
+}
 
 /* Our Character codes
   "Z" - Deflater Version (first character)
@@ -148,7 +180,7 @@ class Deflater {
   **/
   public var useEnumIndex(default, null) : Bool;
 
-  var thash : StringMap<Array<Dynamic>>;
+  var thash : StringMap<Array<DeflatedType>>;
   var tcount : Int;
   var farray : Array<String>;
 
@@ -253,13 +285,13 @@ class Deflater {
       for (i in 0...inflater.tcache.length) {
         var type = inflater.tcache[i];
         if (Std.is(type, serialization.InflatedEnum)) {
-          var info:DeflatedEnum = {
-            name : type.name,
-            index: deflater.tcount++,
-            version: type.serialized_version,
-            potentiallyStale : true,
-            useIndex: type.useIndex,
-          };
+          var info = new DeflatedEnum();
+          info.name = type.name;
+          info.index = deflater.tcount++;
+          info.version = type.serialized_version;
+          info.potentiallyStale = true;
+          info.useIndex = type.useIndex;
+
           var mungedName = mungeClassName(type.name, type.serialized_version);
           if (!deflater.thash.exists(mungedName)) {
             deflater.thash.set(mungedName, []);
@@ -269,13 +301,13 @@ class Deflater {
         }
         else if (Std.is(type, InflatedEnumValue)) {
           var enumType = type.enumType;
-          var info:DeflatedEnumValue = {
-            constructor : type.construct,
-            index: deflater.tcount++,
-            numParams: type.numParams,
-            enumIndex: type.enumIndex,
-            typeIndex: enumType.index,
-          };
+          var info = new DeflatedEnumValue();
+          info.construct = type.construct;
+          info.index = deflater.tcount++;
+          info.numParams = type.numParams;
+          info.enumIndex = type.enumIndex;
+          info.typeIndex = enumType.index;
+
           var mungedName = mungeClassName(enumType.name, enumType.serialized_version) + '::${type.construct}';
           if (!deflater.thash.exists(mungedName)) {
             deflater.thash.set(mungedName, []);
@@ -284,16 +316,16 @@ class Deflater {
           writeEnumValueInfo(deflater, info);
         }
         else {
-          var info:DeflatedClass = {
-            name : type.name,
-            index: deflater.tcount++,
-            baseClassIndex : type.baseClassIndex,
-            custom: type.custom,
-            version: type.serialized_version,
-            startField : deflater.farray.length,
-            numFields: type.numFields,
-            potentiallyStale : true,
-          };
+          var info = new DeflatedClass();
+          info.name = type.name;
+          info.index = deflater.tcount++;
+          info.baseClassIndex = type.baseClassIndex;
+          info.custom = type.custom;
+          info.version = type.serialized_version;
+          info.startField = deflater.farray.length;
+          info.numFields = type.numFields;
+          info.potentiallyStale = true;
+
           var mungedName = mungeClassName(type.name, type.serialized_version);
           if (!deflater.thash.exists(mungedName)) {
             deflater.thash.set(mungedName, []);
@@ -693,7 +725,7 @@ class Deflater {
     var existingClass:DeflatedClass = null;
     if ( types != null ) {
       // get the most recent typeInfo serialized for this class
-      existingClass = types[types.length-1];
+      existingClass = cast types[types.length-1];
       // If it was created from a potentially stale type info, check if it is up-to-date
       if (existingClass.potentiallyStale) {
         if (!typeDiffersFromDeflatedClass(tdeflater, cls, value, classVersion, options.purpose, existingClass)) {
@@ -724,16 +756,15 @@ class Deflater {
       superClassInfo = deflateClassImpl(value, superClass, false);
     }
 
-    var info : DeflatedClass = {
-      index : tdeflater.tcount++,
-      baseClassIndex : superClassInfo != null ? superClassInfo.index : -1,
-      name : name,
-      custom : hasCustom(cls),
-      version : classVersion,
-      startField : tdeflater.farray.length,
-      numFields : 0,
-      potentiallyStale : false,
-    };
+    var info = new DeflatedClass();
+    info.index = tdeflater.tcount++;
+    info.baseClassIndex = superClassInfo != null ? superClassInfo.index : -1;
+    info.name = name;
+    info.custom = hasCustom(cls);
+    info.version = classVersion;
+    info.startField = tdeflater.farray.length;
+    info.numFields = 0;
+    info.potentiallyStale = false;
 
     if (!(superClassInfo == null || info.custom == superClassInfo.custom)) {
       throw 'Cannot serialize ${info.name}, does not share serialization method with ${superClassInfo.name}';
@@ -882,7 +913,7 @@ class Deflater {
     var mungedEnumName = mungeClassName(enumName, enumVersion);
     var mungedValueName = '$mungedEnumName::$constructor';
     var types = tdeflater.thash.get(mungedValueName);
-    var existingValueInfo:DeflatedEnumValue = types != null ? types[types.length-1] : null;
+    var existingValueInfo:DeflatedEnumValue = types != null ? cast types[types.length-1] : null;
     if (existingValueInfo != null) {
       // Only write the index if we need it to identify this instance
       buf.add("_");
@@ -896,7 +927,7 @@ class Deflater {
     var existingInfo:DeflatedEnum = null;
     if ( types != null ) {
       // get the most recent typeInfo serialized for this class
-      existingInfo = types[types.length-1];
+      existingInfo = cast types[types.length-1];
       // If it was created from a potentially stale type info, check if it is up-to-date
       if (existingInfo.potentiallyStale) {
         // if (!typeDiffersFromDeflatedClass(tdeflater, cls, value, classVersion, options.purpose, existingClass)) {
@@ -911,13 +942,12 @@ class Deflater {
     }
 
     if (existingInfo == null) {
-      var info : DeflatedEnum = existingInfo = {
-        index : tdeflater.tcount++,
-        name : enumName,
-        version : enumVersion,
-        useIndex : this.useEnumIndex,
-        potentiallyStale : false,
-      };
+      var info = existingInfo = new DeflatedEnum();
+      info.index = tdeflater.tcount++;
+      info.name = enumName;
+      info.version = enumVersion;
+      info.useIndex = this.useEnumIndex;
+      info.potentiallyStale = false;
 
       if (!tdeflater.thash.exists(mungedEnumName)) {
         tdeflater.thash.set(mungedEnumName, []);
@@ -927,13 +957,13 @@ class Deflater {
       writeEnumInfo(tdeflater, info);
     }
 
-    var info : DeflatedEnumValue = {
-      index : tdeflater.tcount++,
-      typeIndex : existingInfo.index,
-      constructor : existingInfo.useIndex ? null : constructor,
-      enumIndex : Type.enumIndex(value),
-      numParams : TypeUtils.getEnumParameterCount(enm, constructor),
-    };
+    var info = new DeflatedEnumValue();
+    info.index = tdeflater.tcount++;
+    info.typeIndex = existingInfo.index;
+    info.construct = existingInfo.useIndex ? null : constructor;
+    info.enumIndex = Type.enumIndex(value);
+    info.numParams = TypeUtils.getEnumParameterCount(enm, constructor);
+
     if (!tdeflater.thash.exists(mungedValueName)) {
       tdeflater.thash.set(mungedValueName, []);
     }
@@ -961,7 +991,7 @@ class Deflater {
 
   static function writeEnumValueInfo(target:Deflater, info:DeflatedEnumValue) : Void {
     target.buf.add("=");
-    target.serialize(info.constructor);
+    target.serialize(info.construct);
     target.buf.add(":");
     target.buf.add(info.typeIndex);
     target.buf.add(":");
