@@ -28,6 +28,7 @@ import serialization.stream.IInflateStream;
 import serialization.stream.StringInflateStream;
 import serialization.internal.TypeUtils;
 import serialization.internal.FastReflect;
+import serialization.internal.RadixTree;
 
 using StringTools;
 
@@ -136,10 +137,12 @@ class Inflater {
   var length : Int;
   var cache : Array<Dynamic>;
   var scache : Array<String>;
+  var rtree : RadixTree;
   #if neko
   var upos : Int;
   #end
 
+  var typeInflater : Inflater;
   var tcache : Array<InflatedType>;
   var fcache : Array<String>;
   var hcache : Array<Int>;
@@ -168,19 +171,22 @@ class Inflater {
     #if neko
     upos = 0;
     #end
-    scache = new Array();
     cache = new Array();
     ecache = new Map();
 
     if ( opt != null && opt.typeInflater != null ) {
-      tcache = opt.typeInflater.tcache;
-      fcache = opt.typeInflater.fcache;
-      hcache = opt.typeInflater.hcache;
-      scache = opt.typeInflater.scache;
+      typeInflater = opt.typeInflater;
+      tcache = typeInflater.tcache;
+      fcache = typeInflater.fcache;
+      hcache = typeInflater.hcache;
+      scache = typeInflater.scache;
+      rtree = typeInflater.rtree;
     } else {
       tcache = [];
       fcache = [];
       hcache = [];
+      scache = [];
+      rtree = new RadixTree();
     }
     entities = [];
 
@@ -258,10 +264,15 @@ class Inflater {
         inflater.unserializeRawString();
       case "y".code:
         inflater.unserializeURLEncodedString();
+      case '!'.code, '#'.code, '~'.code:
+        stream.seekTo(stream.getPos()-1);
+        inflater.rtree.unserialize(inflater, true);
       case "|".code:
         inflater.inflateEnumInfo();
       case "=".code:
         inflater.inflateEnumValueInfo();
+      default:
+        throw 'unexpected code in typeinfo';
       }
     }
     return inflater;
@@ -1006,6 +1017,10 @@ class Inflater {
       // wind back so unserializeInstance can re-read the character code
       stream.seekTo(stream.getPos()-1);
       return unserializeInstance();
+    case '!'.code, '#'.code, '~'.code:
+      // radix-tree serialized strings
+      stream.seekTo(stream.getPos()-1);
+      return rtree.unserialize(this, typeInflater == null);
     case "|".code, "=".code, "_".code:
       stream.seekTo(stream.getPos()-1);
       return unserializeEnumValue();

@@ -25,6 +25,7 @@ package serialization;
 
 import haxe.ds.StringMap;
 import serialization.internal.TypeUtils;
+import serialization.internal.RadixTree;
 import serialization.stream.StringInflateStream;
 import serialization.Inflater;
 
@@ -35,6 +36,7 @@ typedef DeflaterOptions = {
   ?useEnumIndex : Bool,
   ?useCache : Bool,
   ?skipHeader : Bool,
+  ?compressStrings : Bool,
 };
 
 
@@ -158,6 +160,7 @@ class Deflater {
   var cache : Array<Dynamic>;
   var shash : StringMap<Int>;
   var scount : Int;
+  var rtree : RadixTree;
 
   static var BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%:";
   #if neko
@@ -199,15 +202,17 @@ class Deflater {
     useEnumIndex = opt != null ? opt.useEnumIndex : false;
     shash = new StringMap();
     scount = 0;
+    rtree = new RadixTree();
 
     thash = new StringMap();
     tcount = 0;
     farray = [];
 
     options = {};
-    options.purpose = (opt != null && opt.purpose != null) ? opt.purpose   : null;
+    options.purpose = (opt != null && opt.purpose != null) ? opt.purpose : null;
     options.typeDeflater = opt != null ? opt.typeDeflater : null;
     options.stats = opt != null ? opt.stats : null;
+    options.compressStrings = (opt != null && opt.compressStrings != null) ? opt.compressStrings : false;
 
     // Write our version at the top of the buffer
     if (opt == null || !opt.skipHeader) {
@@ -236,9 +241,15 @@ class Deflater {
       #end
     }
 
-    var buf = this.buf;
     var td = options.typeDeflater;
-    if ( td != null ) {
+    var buf = this.buf;
+    if (td != null && td.options.compressStrings) {
+      var id = td.rtree.serialize(s, td.buf, false);
+      buf.add("~");
+      addInt(buf, id);
+    } else if (td == null && options.compressStrings) {
+      rtree.serialize(s, buf, true);
+    } else if (td != null) {
       var x = td.shash.get(s);
       if( x != null ) {
         buf.add("R");
