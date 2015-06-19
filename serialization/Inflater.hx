@@ -140,7 +140,7 @@ class Inflater {
   var upos : Int;
   #end
 
-  var tcache : Array<Dynamic>;
+  var tcache : Array<InflatedType>;
   var fcache : Array<String>;
   var hcache : Array<Int>;
   var ecache : Map<String, {info:InflatedEnum, values:Array<InflatedEnumValue>}>;
@@ -233,7 +233,7 @@ class Inflater {
       if (classIndex == -1) {
         break;
       }
-      var inflatedClass = tcache[classIndex];
+      var inflatedClass:InflatedClass = cast tcache[classIndex];
       if (inflatedClass.type == cls) {
         return inflatedClass.serialized_version;
       }
@@ -370,7 +370,7 @@ class Inflater {
         if (hierarchyInfo.baseClassIndex == -1) {
           break;
         }
-        hierarchyInfo = tcache[hierarchyInfo.baseClassIndex];
+        hierarchyInfo = cast tcache[hierarchyInfo.baseClassIndex];
       }
 
       // Populate the info with a cache of fields that belong to the current version of this class
@@ -410,7 +410,7 @@ class Inflater {
         throw "Invalid type reference";
       if( stream.readByte() != ":".code )
         throw "Invalid type reference format";
-      return tcache[t];
+      return cast tcache[t];
     case "V".code:
       return inflateClassInfo(true);
     case "W".code:
@@ -524,7 +524,7 @@ class Inflater {
   function upgradeFieldMap(o:Dynamic, fieldMap:Map<String, Dynamic>, info:InflatedClass) : Void {
     // First upgrade the fields on any base classes
     if (info.baseClassIndex != -1) {
-      upgradeFieldMap(o, fieldMap, tcache[info.baseClassIndex]);
+      upgradeFieldMap(o, fieldMap, cast tcache[info.baseClassIndex]);
     }
     if (info.classUpgrade != null) {
       Reflect.callMethod(info.type, info.classUpgrade, [o, info.serialized_version, fieldMap]);
@@ -557,7 +557,7 @@ class Inflater {
         throw "Invalid enum type reference";
       if( stream.readByte() != ":".code )
         throw "Invalid enum type reference format";
-      return tcache[t];
+      return cast tcache[t];
     case "=".code:
       return inflateEnumValueInfo();
     case "|".code:
@@ -644,7 +644,7 @@ class Inflater {
     var valueInfo : InflatedEnumValue = new InflatedEnumValue();
     valueInfo.construct = constructor;
     valueInfo.enumIndex = enum_index;
-    valueInfo.enumType = tcache[type_index];
+    valueInfo.enumType = cast tcache[type_index];
     valueInfo.numParams = num_params;
     valueInfo.index = tcache.length;
     tcache.push(valueInfo);
