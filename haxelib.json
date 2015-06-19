@@ -4,7 +4,7 @@
   "license": "BSD",
   "tags": ["serialization","loading","saving","storage","database","network"],
   "description": "Haxe Serialization Library",
-  "version": "0.1.1",
-  "releasenote": "Initial release",
-  "contributors": ["Proletariat"]
+  "version": "0.2.0",
+  "releasenote": "Adding enum versioning support. Optional Radix tree string compression",
+  "contributors": ["Proletariat", "lpetre"]
 }
