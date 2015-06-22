@@ -6,10 +6,10 @@ Library for supporting serialization of Haxe objects, for persisting to disk or 
 Features
 ===============
 
-* **Type Versioning**: Allows classes to be modified, with custom upgrade functions for old serialized data.
+* **Type Versioning**: Allows classes and enums to be modified, with custom upgrade functions for old serialized data.
 * **Streams**: Deserialize objects directly from disk or any other input source.
 * **Customization**: Control which properties on an object get serialized. 
-* **Optimized Data Size**: Type information is only stored once per type, and can optionally be stored externally.
+* **Optimized Data Size**: Type information is only stored once per type, and can optionally be stored externally. Strings can be compressed to reduce overhead.
 * **Fast Runtime**: Optimized performance (particularly for C#).
 
 Usage
@@ -260,6 +260,7 @@ The Deflater constructor take an options object with the following optional valu
       ?stats : haxe.ds.StringMap<Int>,  // If not-null, filled with stats on the serialized object.
       ?useEnumIndex : Bool,             // Serialize enums by index instead of name. CAN BREAK VERSIONING.
       ?useCache : Bool,                 // Allow circular references between objects to be serialized correctly.
+      ?compressStrings : Bool,          // Attempt to compress strings
     };
 </pre>
 
@@ -268,3 +269,5 @@ The `stats` parameter, when initialized, will be populated with each key being a
 Note that useEnumIndex can break versioning if values are re-arranged in an enum definition, or new values are added to the middle of an enum definition. For that reason, it is recommended that this be set to false (the default) if the serialized data may be versioned.
 
 Note that useCache has an impact on serialization performance, hence it is disabled by default.
+
+If 'compressStrings' is true, the deflater will use a [Radix Tree](https://en.wikipedia.org/wiki/Radix_tree) to attempt to combine similar strings, reducing their storage cost. This is useful when you are storing many strings with the same prefix, such as URLs, file paths, or IP addresses. This can decrease the amount of storage space required, but does take somewhat more time and memory to inflate/deflate.
