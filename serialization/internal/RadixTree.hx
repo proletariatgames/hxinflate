@@ -236,6 +236,10 @@ class RadixTree
   }
 
   function uptree(start:RadixNode) : String {
+    if (start.cached != null) {
+      return start.cached;
+    }
+
     var nodes = [];
     var cur = start;
     var root = this.root;
@@ -248,7 +252,8 @@ class RadixTree
     while (i-- > 0) {
       buf.add(nodes[i].data);
     }
-    return buf.toString();
+
+    return start.cached=buf.toString();
   }
 
   inline function createNode(part:String) : RadixNode {
@@ -293,10 +298,12 @@ private class RadixNode
 {
   public var id:Int;
   public var data:String;
+  public var cached:String;
   public var parent:RadixNode;
   public var children:Array<RadixNode>;
 
   public function new(data:String, id:Int) {
+    this.cached = null;
     this.id = id;
     this.data = data;
     this.parent = null;
