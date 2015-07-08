@@ -216,8 +216,9 @@ class TypeUtils
   public static function getEnumParameterCount(e:Enum<Dynamic>, v : Dynamic) : Int {
     #if neko   
       return v.args == null ? 0 : untyped __dollar__asize(v.args);
-    #elseif flash9   
-      return v.params == null ? 0 : pl.length;
+    #elseif flash9
+      var pl : Array<Dynamic> = v.params;
+      return pl == null ? 0 : pl.length;
     #elseif cpp    
       var pl : Array<Dynamic> = v.__EnumParams();
       return pl == null ? 0 : pl.length;
