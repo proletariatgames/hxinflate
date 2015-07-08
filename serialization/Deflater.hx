@@ -214,7 +214,7 @@ class Deflater {
     options.typeDeflater = opt != null ? opt.typeDeflater : null;
     options.stats = opt != null ? opt.stats : null;
     options.compressStrings = (opt != null && opt.compressStrings != null) ? opt.compressStrings : false;
-    options.useEnumVersioning = opt != null ? opt.useEnumVersioning : false;
+    options.useEnumVersioning = opt != null ? opt.useEnumVersioning : true;
 
     // Write our version at the top of the buffer
     if (opt == null || !opt.skipHeader) {

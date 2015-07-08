@@ -4,7 +4,7 @@
   "license": "BSD",
   "tags": ["serialization","loading","saving","storage","database","network"],
   "description": "Haxe Serialization Library",
-  "version": "0.2.2",
-  "releasenote": "Flash 9 fix and old style enum serialization as default",
+  "version": "0.2.3",
+  "releasenote": "New style enum serialization as default",
   "contributors": ["Proletariat", "lpetre", "danogles"]
 }
