@@ -34,6 +34,7 @@ typedef DeflaterOptions = {
   ?typeDeflater : Deflater,
   ?stats : haxe.ds.StringMap<Int>,
   ?useEnumIndex : Bool,
+  ?useEnumVersioning : Bool,
   ?useCache : Bool,
   ?skipHeader : Bool,
   ?compressStrings : Bool,
@@ -213,6 +214,7 @@ class Deflater {
     options.typeDeflater = opt != null ? opt.typeDeflater : null;
     options.stats = opt != null ? opt.stats : null;
     options.compressStrings = (opt != null && opt.compressStrings != null) ? opt.compressStrings : false;
+    options.useEnumVersioning = opt != null ? opt.useEnumVersioning : false;
 
     // Write our version at the top of the buffer
     if (opt == null || !opt.skipHeader) {
@@ -378,8 +380,13 @@ class Deflater {
     case TObject:
       serializeObject(v);
     case TEnum(e):
-      var valueInfo = deflateEnum(v, e);
-      deflateEnumValue(v, valueInfo);
+      if (options.useEnumVersioning) {
+        var valueInfo = deflateEnum(v, e);
+        deflateEnumValue(v, valueInfo);
+      }
+      else {
+        serializeEnum(v, e);
+      }
     case TFunction:
       throw "Cannot serialize function";
     default:
@@ -618,6 +625,104 @@ class Deflater {
       return;
     buf.add("o");
     serializeFields(v);
+  }
+
+  inline function serializeEnum(v : Dynamic, e : Enum<Dynamic>) : Void {
+    if (!useCache || !serializeRef(v)) {
+      cache.pop();
+      buf.add(useEnumIndex?"j":"w");
+      serializeString(Type.getEnumName(e));
+      #if neko
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v.index);
+      } else
+        serializeString(new String(v.tag));
+      buf.add(":");
+      if( v.args == null )
+        buf.add(0);
+      else {
+        var l : Int = untyped __dollar__asize(v.args);
+        buf.add(l);
+        for( i in 0...l )
+          serialize(v.args[i]);
+      }
+      #elseif flash9
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v.index);
+      } else
+        serializeString(v.tag);
+      buf.add(":");
+      var pl : Array<Dynamic> = v.params;
+      if( pl == null )
+        buf.add(0);
+      else {
+        buf.add(pl.length);
+        for( p in pl )
+          serialize(p);
+      }
+      #elseif cpp
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v.__Index());
+      } else
+        serializeString(v.__Tag());
+      buf.add(":");
+      var pl : Array<Dynamic> = v.__EnumParams();
+      if( pl == null )
+        buf.add(0);
+      else {
+        buf.add(pl.length);
+        for( p in pl )
+          serialize(p);
+      }
+      #elseif php
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v.index);
+      } else
+        serializeString(v.tag);
+      buf.add(":");
+      var l : Int = untyped __call__("count", v.params);
+      if( l == 0 || v.params == null)
+        buf.add(0);
+      else {
+        buf.add(l);
+        for( i in 0...l )
+          serialize(untyped __field__(v, __php__("params"), i));
+      }
+      #elseif (java || cs)
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(Type.enumIndex(v));
+      } else
+        serializeString(Type.enumConstructor(v));
+      buf.add(":");
+      var arr:Array<Dynamic> = Type.enumParameters(v);
+      if (arr != null)
+      {
+        buf.add(arr.length);
+        for (v in arr)
+          serialize(v);
+      } else {
+        buf.add("0");
+      }
+
+      #else
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v[1]);
+      } else
+        serializeString(v[0]);
+      buf.add(":");
+      var l = v[untyped "length"];
+      buf.add(l - 2);
+      for( i in 2...l )
+        serialize(v[i]);
+      #end
+      cache.push(v);
+    }
   }
 
   /**
