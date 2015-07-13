@@ -17,19 +17,19 @@ Usage
 
 ### Serializing An Object
 
-<pre>
-    var def = new Deflater();
-    defl.serialize(myObject);
-    var serializedObject:String = defl.toString();
-</pre>
+```haxe
+var def = new Deflater();
+defl.serialize(myObject);
+var serializedObject:String = defl.toString();
+```
 
 ### Deserializing An Object
 
-<pre>
-    var stm = new StringInflateStream(serializedObject);
-    var inf = new Inflater(stm);
-    var myObject:MyObjectType = inf.unserialize();
-</pre>
+```haxe
+var stm = new StringInflateStream(serializedObject);
+ar inf = new Inflater(stm);
+var myObject:MyObjectType = inf.unserialize();
+```
 
 Streams
 ==============
@@ -51,36 +51,36 @@ Properties marked with the `@nostore` metadata will never be included in the ser
 
 Example:
 
-<pre>
-    class Account {
-      // Don't serialize this if we're serializing to send to the client.
-      @nostore("client") public var privateKey:String;
+```haxe
+class Account {
+  // Don't serialize this if we're serializing to send to the client.
+  @nostore("client") public var privateKey:String;
 
-      // Don't serialize this if we're serializing to send to the server.
-      @nostore("server") public var spriteName:String;
+  // Don't serialize this if we're serializing to send to the server.
+  @nostore("server") public var spriteName:String;
 
-      // NEVER serialize this.
-      @nostore public var sessionID:Int;
+  // NEVER serialize this.
+  @nostore public var sessionID:Int;
 
-      public function serializeForServer() : String {
-        var def = new Deflater({purpose:"server"});
-        def.serialize(this);
-        return def.toString();
-      }
+  public function serializeForServer() : String {
+    var def = new Deflater({purpose:"server"});
+    def.serialize(this);
+    return def.toString();
+  }
 
-      public function serializeForClient() : Stirng {
-        var def = new Deflater({purpose:"client"});
-        def.serialize(this);
-        return def.toString();
-      }
-    }
-</pre>
+  public function serializeForClient() : Stirng {
+    var def = new Deflater({purpose:"client"});
+    def.serialize(this);
+    return def.toString();
+  }
+}
+```
 
 Serialization can be further customized by including a special static function on the class:
 
-<pre>
-    public static function _CLASSNAME_shouldSerializeField(cls:Class<Dynamic>, fieldName:String) : Bool;
-</pre>
+```haxe
+public static function _CLASSNAME_shouldSerializeField(cls:Class<Dynamic>, fieldName:String) : Bool;
+```
 
 If this function returns false, the specified field will not be serialized.
 
@@ -98,9 +98,9 @@ All serialized class instances include a version number, which is zero (0) by de
 2. Add a `@version` metadata to the class, specifying the current version number
 3. Add a static `_upgrade_version function`, with the following signature:
 
-<pre>
-    public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void;
-</pre>
+```haxe
+public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void;
+```
 
 - `instance` is the object being deserialized, *before* any fields have been written.
 - `version` is the version of the object *at the time it was serialized*.
@@ -108,32 +108,32 @@ All serialized class instances include a version number, which is zero (0) by de
 
 For example, imagine the following class was originally written, and instances have been serialized to a database.
 
-<pre>
-    class Player {
-      public var firstName:String;
-      public var lastName:String;
-    }
-</pre>
+```haxe
+class Player {
+  public var firstName:String;
+  public var lastName:String;
+}
+```
 
 Later, it was decided to add an extra "xp" field to the class, and that there should be a single field for the player name, rather than firstName/lastName. The following modifications can be added to the class in order for it to still be able to deserialize old instances:
 
-<pre>
-    @version(1) class Player implements serialization.Deflatable {
-      public var name:String;
-      public var xp:Int;
+```haxe
+@version(1) class Player implements serialization.Deflatable {
+  public var name:String;
+  public var xp:Int;
 
-      public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void {
-        if (version &lt; 1) {
-          // Add new fields to the map
-          fieldsMap["name"] = fieldsMap["firstName"] + " " + fieldsMap["lastName"];
-          fieldsMap["xp"] = 1;
-          // fields that no longer exist MUST be removed from the map!
-          fieldsMap.remove("firstName");
-          fieldsMap.remove("lastName");
-        }
-      }
+  public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void {
+    if (version &lt; 1) {
+      // Add new fields to the map
+      fieldsMap["name"] = fieldsMap["firstName"] + " " + fieldsMap["lastName"];
+      fieldsMap["xp"] = 1;
+      // fields that no longer exist MUST be removed from the map!
+      fieldsMap.remove("firstName");
+      fieldsMap.remove("lastName");
     }
-</pre>
+  }
+}
+```
 
 ### Versioning An Enum
 
@@ -145,9 +145,9 @@ All serialized enum types include a version number, which is zero (0) by default
 2. Add a `@version` metadata to the class, specifying the current version number
 3. Add a static `_upgrade_enum function`, with the following signature:
 
-<pre>
-    public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) : Void;
-</pre>
+```haxe
+public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>}) : Void;
+```
 
 - `version` is the version of the enum *at the time it was serialized*.
 - `data` is a typedef with two fields:
@@ -156,30 +156,30 @@ All serialized enum types include a version number, which is zero (0) by default
 
 For example, imagine the following enum was originally written, and instances have been serialized to a database.
 
-<pre>
-    enum PVPOpponent {
-      AI;
-      Human;
-    }
-</pre>
+```haxe
+enum PVPOpponent {
+  AI;
+  Human;
+}
+```
 
 Later, it was decided to add an extra "name" parameter to the Human type, and that the AI constructor should be renamed to Computer. The following modifications can be done with a new class that allows be able to deserialize old instances:
 
-<pre>
-    @version(1) @:keep class PVPOpponent_deflatable implements serialization.Deflatable {
-      public static function _upgrade_enum(version:Int, , data:{constructor:String, params:Array<Dynamic>) : Void {
-        if (version &lt; 1) {
-          switch(data.constructor) {
-          // rename the old constructor
-          case 'AI': data.constructor = 'Computer';
+```haxe
+@version(1) @:keep class PVPOpponent_deflatable implements serialization.Deflatable {
+  public static function _upgrade_enum(version:Int, , data:{constructor:String, params:Array<Dynamic>) : Void {
+    if (version &lt; 1) {
+      switch(data.constructor) {
+      // rename the old constructor
+      case 'AI': data.constructor = 'Computer';
 
-          // add a new default parameter
-          case 'Human': data.params = ['Bob'];
-          }
-        }
+      // add a new default parameter
+      case 'Human': data.params = ['Bob'];
       }
     }
-</pre>
+  }
+}
+```
 
 ### Limitations
 
@@ -210,59 +210,59 @@ This type cache also stores all unique strings that appear in the serialized str
 
 The following function will serialize all objects in the input array separately, but create a single type info cache.
 
-<pre>
-    // Serialize all input objects into separate streams, with a single type cache
-    function deflateObjects(objs:Array<Dynamic> results:Array<String>) : String {
-      // create the stream where all strings and type information will get written
-      var typeCache = new Deflater();
+```haxe
+// Serialize all input objects into separate streams, with a single type cache
+function deflateObjects(objs:Array<Dynamic> results:Array<String>) : String {
+  // create the stream where all strings and type information will get written
+  var typeCache = new Deflater();
 
-      for (o in objs) {
-        // deflate the object, telling the deflater to store type information in typeCache instead
-        var def = new Deflater({typeDeflater:typeCache});
-        def.serialize(o);
-        // store the deflated object
-        results.push(def.toString());
-      }
-      
-      // return the serialized type information.
-      return typeCache.toString();
-    }
-</pre>
+  for (o in objs) {
+    // deflate the object, telling the deflater to store type information in typeCache instead
+    var def = new Deflater({typeDeflater:typeCache});
+    def.serialize(o);
+    // store the deflated object
+    results.push(def.toString());
+  }
+  
+  // return the serialized type information.
+  return typeCache.toString();
+}
+```
 
 This function will deserialize a list of serialized objects, using an external type cache.
 
-<pre>
-    // Deserialize all input objects, using the specified type cache
-    function inflateObjects(objs:Array<String>, typeCache:String) : Array<String> {
-      // Inflate the type information for all objects
-      var typeCache = Inflater.inflateTypeInfo(new StringInflateStream(typeCache)); 
+```haxe
+// Deserialize all input objects, using the specified type cache
+function inflateObjects(objs:Array<String>, typeCache:String) : Array<String> {
+  // Inflate the type information for all objects
+  var typeCache = Inflater.inflateTypeInfo(new StringInflateStream(typeCache)); 
 
-      var results = [];
-      for (o in objs) {
-        // inflate the object, telling the inflater to use the type information in typeCache
-        var inf = new Inflater(new StringInflateStream(o), {typeInflater:typeCache});
-        results.push(inf.unserialize());
-      }
+  var results = [];
+  for (o in objs) {
+    // inflate the object, telling the inflater to use the type information in typeCache
+    var inf = new Inflater(new StringInflateStream(o), {typeInflater:typeCache});
+    results.push(inf.unserialize());
+  }
 
-      return results;
-    }
-</pre>
+  return results;
+}
+```
    
 Additional Features
 =================
 
 The Deflater constructor take an options object with the following optional values:
 
-<pre>
-    typedef DeflaterOptions = {
-      ?purpose : String,                // See "Controlling Serialization"
-      ?typeDeflater : Deflater,         // See "Type Caching"
-      ?stats : haxe.ds.StringMap<Int>,  // If not-null, filled with stats on the serialized object.
-      ?useEnumIndex : Bool,             // Serialize enums by index instead of name. CAN BREAK VERSIONING.
-      ?useCache : Bool,                 // Allow circular references between objects to be serialized correctly.
-      ?compressStrings : Bool,          // Attempt to compress strings
-    };
-</pre>
+```haxe
+typedef DeflaterOptions = {
+  ?purpose : String,                // See "Controlling Serialization"
+  ?typeDeflater : Deflater,         // See "Type Caching"
+  ?stats : haxe.ds.StringMap<Int>,  // If not-null, filled with stats on the serialized object.
+  ?useEnumIndex : Bool,             // Serialize enums by index instead of name. CAN BREAK VERSIONING.
+  ?useCache : Bool,                 // Allow circular references between objects to be serialized correctly.
+  ?compressStrings : Bool,          // Attempt to compress strings
+};
+```
 
 The `stats` parameter, when initialized, will be populated with each key being a class name, and the corresponding value being the total size in bytes of all instances stored of that class.
 
