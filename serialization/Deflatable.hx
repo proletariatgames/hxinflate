@@ -32,7 +32,7 @@ import haxe.macro.Type;
 //  - no rtti, add a static method that returns version info
 //  - keep on fields and hxSerialize / hxUnserialize instead of entire class
 
-@:autoBuild(serialization.DeflatableBuild.build())
+#if !macro @:autoBuild(serialization.DeflatableBuild.build()) #end
 interface Deflatable
 {
 }
