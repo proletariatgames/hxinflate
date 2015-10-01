@@ -57,12 +57,12 @@ class RadixTree
     this.root.children.push(newBranch);
 
     buf.add("!");
-    addInt(buf, this.root.id-this.lastOffset);
+    buf.addInt(this.root.id-this.lastOffset);
     lastOffset = this.root.id;
     buf.add(":");
-    addInt(buf, newBranch.data.length);
+    buf.addInt(newBranch.data.length);
     buf.add(":");
-    addStr(buf, newBranch.data);
+    buf.addStr(newBranch.data);
 
     return newBranch.id;
   }
@@ -89,14 +89,14 @@ class RadixTree
       newSuffix.parent = split;
 
       buf.add("#");
-      addInt(buf, cur.id-this.lastOffset);
+      buf.addInt(cur.id-this.lastOffset);
       this.lastOffset = cur.id;
       buf.add(":");
-      addInt(buf, num);
+      buf.addInt(num);
       buf.add(":");
-      addInt(buf, newSuffix.data.length);
+      buf.addInt(newSuffix.data.length);
       buf.add(":");
-      addStr(buf, newSuffix.data);
+      buf.addStr(newSuffix.data);
 
       return newSuffix.id;
     } else if (start+num != word.length) {
@@ -113,18 +113,18 @@ class RadixTree
       newSuffix.parent = cur;
       cur.children.push(newSuffix);
       buf.add("!");
-      addInt(buf, cur.id-this.lastOffset);
+      buf.addInt(cur.id-this.lastOffset);
       this.lastOffset = cur.id;
       buf.add(":");
-      addInt(buf, newSuffix.data.length);
+      buf.addInt(newSuffix.data.length);
       buf.add(":");
-      addStr(buf, newSuffix.data);
+      buf.addStr(newSuffix.data);
 
       return newSuffix.id;
     } else {
       if (includeExisting) {
         buf.add('~');
-        addInt(buf, cur.id-this.lastOffset);
+        buf.addInt(cur.id-this.lastOffset);
         this.lastOffset = cur.id;
       }
       return cur.id;
@@ -276,22 +276,6 @@ class RadixTree
       }
     }
     return matches;
-  }
-
-  // mini optimizations to improve codegen for JS
-  static inline function addInt(buf:IDeflateStream, x:Int) {
-    // #if js
-    //   untyped buf.b += x;
-    // #else
-      buf.add(x);
-    // #end
-  }
-  static inline function addStr(buf:IDeflateStream, x:String) {
-    // #if js
-    //   untyped buf.b += x;
-    // #else
-      buf.add(x);
-    // #end
   }
 }
 

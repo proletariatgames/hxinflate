@@ -28,14 +28,28 @@ class StringDeflateStream implements IDeflateStream
 {
   var buf:StringBuf;
 
-  public function new() : Void {
-    this.buf = new StringBuf();
-  }
-
-  public function dispose() this.buf = null;
-  public function getPos() return this.buf.length;
-  public function add<T>( x : T ) this.buf.add(x);
+  public function new() this.buf = new StringBuf();
   public function toString() return this.buf.toString();
+  public function dispose() this.buf = null;
+
+  inline public function getPos() return this.buf.length;
+  inline public function add<T>( x : T ) this.buf.add(x);
+
+  // mini optimizations to improve codegen for JS
+  inline public function addInt(x:Int) {
+    #if js
+      untyped this.buf.b += x;
+    #else
+      this.buf.add(x);
+    #end
+  }
+  inline public function addStr(x:String) {
+    #if js
+      untyped this.buf.b += x;
+    #else
+      this.buf.add(x);
+    #end
+  }
 }
 
 

@@ -29,5 +29,7 @@ interface IDeflateStream
   function getPos() : Int;
   function dispose() : Void;
   function add<T>( x : T ) : Void;
+  function addStr( x : String ) : Void;
+  function addInt( x : Int ) : Void;
 }
 

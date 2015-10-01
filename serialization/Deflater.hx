@@ -229,57 +229,41 @@ class Deflater {
   }
 
   function serializeString( s : String ) {
-    // mini optimizations to improve codegen for JS
-    inline function addInt(buf:IDeflateStream, x:Int) {
-      // #if js
-      //   untyped buf.b += x;
-      // #else
-        buf.add(x);
-      // #end
-    }
-    inline function addStr(buf:IDeflateStream, x:String) {
-      // #if js
-      //   untyped buf.b += x;
-      // #else
-        buf.add(x);
-      // #end
-    }
-
     var td = options.typeDeflater;
     var buf = this.buf;
     if (td != null && td.options.compressStrings) {
       var id = td.rtree.serialize(s, td.buf, false);
       buf.add("~");
-      addInt(buf, id);
+      buf.addInt(id);
     } else if (td == null && options.compressStrings) {
       rtree.serialize(s, buf, true);
     } else if (td != null) {
       var x = td.shash.get(s);
       if( x != null ) {
         buf.add("R");
-        addInt(buf, x);
+        buf.addInt(x);
         return;
       }
       td.shash.set(s,td.scount);
       buf.add("R");
-      addInt(buf, td.scount);
+      buf.addInt(td.scount);
       td.scount++;
 
       td.buf.add("Y");
-      addInt(td.buf, s.length);
+      td.buf.addInt(s.length);
       td.buf.add(":");
-      addStr(td.buf, s);
+      td.buf.addStr(s);
     } else {
       var x = shash.get(s);
       if ( x != null ) {
         buf.add("R");
-        addInt(buf, x);
+        buf.addInt(x);
       } else {
         shash.set(s,scount++);
         buf.add("Y"); // denotes raw (not url-encoded) string
-        addInt(buf,s.length);
+        buf.addInt(s.length);
         buf.add(":");
-        addStr(buf, s);
+        buf.addStr(s);
       }
     }
   }
