@@ -26,6 +26,8 @@ package serialization;
 import haxe.ds.StringMap;
 import serialization.internal.TypeUtils;
 import serialization.internal.RadixTree;
+import serialization.stream.IDeflateStream;
+import serialization.stream.StringDeflateStream;
 import serialization.stream.StringInflateStream;
 import serialization.Inflater;
 
@@ -157,7 +159,7 @@ class Deflater {
   public static inline var VERSION_CODE = "ZVER";
   public static inline var VERSION : Int = 3;
 
-  var buf : StringBuf;
+  var buf : IDeflateStream;
   var cache : Array<Dynamic>;
   var shash : StringMap<Int>;
   var scount : Int;
@@ -196,8 +198,8 @@ class Deflater {
     Each Deflater instance maintains its own cache if [this].useCache is
     true.
   **/
-  public function new(?opt:DeflaterOptions) {
-    buf = new StringBuf();
+  public function new(stream:IDeflateStream, ?opt:DeflaterOptions) {
+    buf = stream;
     cache = new Array();
     useCache = opt != null ? opt.useCache : false;
     useEnumIndex = opt != null ? opt.useEnumIndex : false;
@@ -228,19 +230,19 @@ class Deflater {
 
   function serializeString( s : String ) {
     // mini optimizations to improve codegen for JS
-    inline function addInt(buf:StringBuf, x:Int) {
-      #if js
-        untyped buf.b += x;
-      #else
+    inline function addInt(buf:IDeflateStream, x:Int) {
+      // #if js
+      //   untyped buf.b += x;
+      // #else
         buf.add(x);
-      #end
+      // #end
     }
-    inline function addStr(buf:StringBuf, x:String) {
-      #if js
-        untyped buf.b += x;
-      #else
+    inline function addStr(buf:IDeflateStream, x:String) {
+      // #if js
+      //   untyped buf.b += x;
+      // #else
         buf.add(x);
-      #end
+      // #end
     }
 
     var td = options.typeDeflater;
@@ -283,7 +285,8 @@ class Deflater {
   }
 
   public static function inflateTypeInfo(buf:String) : Deflater {
-    var deflater = new Deflater();
+    var strm = new StringDeflateStream();
+    var deflater = new Deflater(strm);
     if (buf != null) {
       var inflater = Inflater.inflateTypeInfo(new StringInflateStream(buf));
       var i_scache = inflater.scache;
@@ -731,9 +734,9 @@ class Deflater {
     The exact format specification can be found here:
     http://haxe.org/manual/serialization/format
   **/
-  public function toString() {
-    return buf.toString();
-  }
+  // public function toString() {
+  //   return buf.toString();
+  // }
 
   /**
     Serializes `v` and returns the String representation.
@@ -743,9 +746,10 @@ class Deflater {
     to toString().
   **/
   public static function run( v : Dynamic , ?options : DeflaterOptions ) {
-    var s = new Deflater(options);
+    var strm = new StringDeflateStream();
+    var s = new Deflater(strm, options);
     s.serialize(v);
-    return s.toString();
+    return strm.toString();
   }
 
   inline static function hasCustom(cls : Class<Dynamic>) : Bool {
@@ -968,7 +972,7 @@ class Deflater {
   public function deflateInstance(v : Dynamic, info : DeflatedClass) {
     var startPos = 0;
     if ( options.stats != null ) {
-      startPos = buf.toString().length;
+      startPos = buf.getPos();
     }
 
     cache.push(v);
@@ -1002,7 +1006,7 @@ class Deflater {
     }
 
     if ( options.stats != null ) {
-      var endPos = buf.toString().length;
+      var endPos = buf.getPos();
       var name = Type.getClassName(Type.getClass(v));
       if ( !options.stats.exists(name) ) {
         options.stats.set(name, 0);

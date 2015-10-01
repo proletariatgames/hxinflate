@@ -22,6 +22,7 @@
 package serialization.internal;
 
 import serialization.stream.IInflateStream;
+import serialization.stream.IDeflateStream;
 
 using StringTools;
 
@@ -43,7 +44,7 @@ class RadixTree
     this.root = createNode("");
   }
 
-  public function serialize(word:String, buf:StringBuf, includeExisting:Bool) : Int {
+  public function serialize(word:String, buf:IDeflateStream, includeExisting:Bool) : Int {
     for (child in this.root.children) {
       var id = serialize_(word, 0, child, buf, includeExisting);
       if (id >= 0) {
@@ -66,7 +67,7 @@ class RadixTree
     return newBranch.id;
   }
 
-  function serialize_(word:String, start:Int, cur:RadixNode, buf:StringBuf, includeExisting:Bool) : Int {
+  function serialize_(word:String, start:Int, cur:RadixNode, buf:IDeflateStream, includeExisting:Bool) : Int {
     var num = findConsecutiveMatch(word, start, cur.data);
     if (num == 0) {
       return -1;
@@ -278,19 +279,19 @@ class RadixTree
   }
 
   // mini optimizations to improve codegen for JS
-  static inline function addInt(buf:StringBuf, x:Int) {
-    #if js
-      untyped buf.b += x;
-    #else
+  static inline function addInt(buf:IDeflateStream, x:Int) {
+    // #if js
+    //   untyped buf.b += x;
+    // #else
       buf.add(x);
-    #end
+    // #end
   }
-  static inline function addStr(buf:StringBuf, x:String) {
-    #if js
-      untyped buf.b += x;
-    #else
+  static inline function addStr(buf:IDeflateStream, x:String) {
+    // #if js
+    //   untyped buf.b += x;
+    // #else
       buf.add(x);
-    #end
+    // #end
   }
 }
 
