@@ -112,7 +112,7 @@ class FastReflect
       Reflect.setProperty(o, field, value);
     #if debug
     } catch (e:Dynamic) {
-      utils.Assert.fail('Failed to set property $field on $o to $value: $e');
+      throw 'Failed to set property $field on $o to $value: $e';
     }
     #end
   }
