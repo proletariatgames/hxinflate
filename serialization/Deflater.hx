@@ -283,77 +283,83 @@ class Deflater {
   }
 
   public static function inflateTypeInfo(buf:String) : Deflater {
-    var deflater = new Deflater();
     if (buf != null) {
       var inflater = Inflater.inflateTypeInfo(new StringInflateStream(buf));
-      var i_scache = inflater.scache;
-      for (i in 0...i_scache.length) {
-        deflater.serializeString(i_scache[i]);
-      }
-      if (deflater.scount != i_scache.length) {
-        throw 'bad length';
-      }
-      for (i in 0...inflater.tcache.length) {
-        var type = inflater.tcache[i];
-        if (Std.is(type, serialization.InflatedEnum)) {
-          var ctype:InflatedEnum = cast type;
-          var info = new DeflatedEnum();
-          info.name = ctype.name;
-          info.index = deflater.tcount++;
-          info.version = ctype.serialized_version;
-          info.useIndex = ctype.useIndex;
+      return getTypeInfoFromInflater(inflater);
+    } else {
+      return new Deflater();
+    }
+  }
+  
+  public static function getTypeInfoFromInflater(inflater:Inflater) {
+    var deflater = new Deflater();
+    var i_scache = inflater.scache;
+    for (i in 0...i_scache.length) {
+      deflater.serializeString(i_scache[i]);
+    }
+    if (deflater.scount != i_scache.length) {
+      throw 'bad length';
+    }
+    for (i in 0...inflater.tcache.length) {
+      var type = inflater.tcache[i];
+      if (Std.is(type, serialization.InflatedEnum)) {
+        var ctype:InflatedEnum = cast type;
+        var info = new DeflatedEnum();
+        info.name = ctype.name;
+        info.index = deflater.tcount++;
+        info.version = ctype.serialized_version;
+        info.useIndex = ctype.useIndex;
 
-          var mungedName = mungeClassName(ctype.name, ctype.serialized_version);
-          if (!deflater.thash.exists(mungedName)) {
-            deflater.thash.set(mungedName, []);
-          }
-          deflater.thash.get(mungedName).push(info);
-          writeEnumInfo(deflater, info);
+        var mungedName = mungeClassName(ctype.name, ctype.serialized_version);
+        if (!deflater.thash.exists(mungedName)) {
+          deflater.thash.set(mungedName, []);
         }
-        else if (Std.is(type, InflatedEnumValue)) {
-          var ctype:InflatedEnumValue = cast type;
-          var enumType = ctype.enumType;
-          var info = new DeflatedEnumValue();
-          info.construct = ctype.construct;
-          info.index = deflater.tcount++;
-          info.numParams = ctype.numParams;
-          info.enumIndex = ctype.enumIndex;
-          info.typeIndex = enumType.index;
-
-          var mungedName = mungeClassName(enumType.name, enumType.serialized_version) + '::${ctype.construct}';
-          if (!deflater.thash.exists(mungedName)) {
-            deflater.thash.set(mungedName, []);
-          }
-          deflater.thash.get(mungedName).push(info);
-          writeEnumValueInfo(deflater, info);
-        }
-        else {
-          var ctype:InflatedClass = cast type;
-          var info = new DeflatedClass();
-          info.name = ctype.name;
-          info.index = deflater.tcount++;
-          info.baseClassIndex = ctype.baseClassIndex;
-          info.custom = ctype.custom;
-          info.version = ctype.serialized_version;
-          info.startField = deflater.farray.length;
-          info.numFields = ctype.numFields;
-          info.potentiallyStale = true;
-
-          var mungedName = mungeClassName(ctype.name, ctype.serialized_version);
-          if (!deflater.thash.exists(mungedName)) {
-            deflater.thash.set(mungedName, []);
-          }
-          deflater.thash.get(mungedName).push(info);
-
-          deflater.buf.add("V");
-          writeClassInfo(deflater, info, inflater.fcache.slice(ctype.startField, ctype.startField+ctype.numFields));
-        }
+        deflater.thash.get(mungedName).push(info);
+        writeEnumInfo(deflater, info);
       }
-      if (deflater.tcount != inflater.tcache.length) {
-        throw 'bad length';
+      else if (Std.is(type, InflatedEnumValue)) {
+        var ctype:InflatedEnumValue = cast type;
+        var enumType = ctype.enumType;
+        var info = new DeflatedEnumValue();
+        info.construct = ctype.construct;
+        info.index = deflater.tcount++;
+        info.numParams = ctype.numParams;
+        info.enumIndex = ctype.enumIndex;
+        info.typeIndex = enumType.index;
+
+        var mungedName = mungeClassName(enumType.name, enumType.serialized_version) + '::${ctype.construct}';
+        if (!deflater.thash.exists(mungedName)) {
+          deflater.thash.set(mungedName, []);
+        }
+        deflater.thash.get(mungedName).push(info);
+        writeEnumValueInfo(deflater, info);
+      }
+      else {
+        var ctype:InflatedClass = cast type;
+        var info = new DeflatedClass();
+        info.name = ctype.name;
+        info.index = deflater.tcount++;
+        info.baseClassIndex = ctype.baseClassIndex;
+        info.custom = ctype.custom;
+        info.version = ctype.serialized_version;
+        info.startField = deflater.farray.length;
+        info.numFields = ctype.numFields;
+        info.potentiallyStale = true;
+
+        var mungedName = mungeClassName(ctype.name, ctype.serialized_version);
+        if (!deflater.thash.exists(mungedName)) {
+          deflater.thash.set(mungedName, []);
+        }
+        deflater.thash.get(mungedName).push(info);
+
+        deflater.buf.add("V");
+        writeClassInfo(deflater, info, inflater.fcache.slice(ctype.startField, ctype.startField+ctype.numFields));
       }
     }
-
+    if (deflater.tcount != inflater.tcache.length) {
+      throw 'bad length';
+    }
+    
     return deflater;
   }
 

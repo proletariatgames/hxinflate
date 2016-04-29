@@ -133,6 +133,7 @@ class Inflater {
     return codes;
   }
 
+  public var options(default, null) : InflaterOptions;
   var stream : IInflateStream;
   var length : Int;
   var cache : Array<Dynamic>;
@@ -166,6 +167,7 @@ class Inflater {
     We have special handling for versioned objects
   **/
   public function new(stream:IInflateStream, ?opt:InflaterOptions) {
+    this.options = opt;
     this.stream = stream;
     length = stream.getLength();
     #if neko
