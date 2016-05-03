@@ -209,12 +209,13 @@ class Deflater {
     tcount = 0;
     farray = [];
 
-    options = {};
-    options.purpose = (opt != null && opt.purpose != null) ? opt.purpose : null;
-    options.typeDeflater = opt != null ? opt.typeDeflater : null;
-    options.stats = opt != null ? opt.stats : null;
-    options.compressStrings = (opt != null && opt.compressStrings != null) ? opt.compressStrings : false;
-    options.useEnumVersioning = opt != null ? opt.useEnumVersioning : true;
+    options = opt != null ? opt : { purpose:null, typeDeflater:null, stats:null };
+    if (options.compressStrings == null) {
+      options.compressStrings = false;
+    }
+    if (options.useEnumVersioning == null) {
+      options.useEnumVersioning = true;
+    }
 
     // Write our version at the top of the buffer
     if (opt == null || !opt.skipHeader) {
