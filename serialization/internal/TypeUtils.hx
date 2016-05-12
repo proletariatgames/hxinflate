@@ -214,21 +214,29 @@ class TypeUtils
   }
 
   public static function getEnumParameterCount(e:Enum<Dynamic>, v : Dynamic) : Int {
-    #if neko   
+    #if neko
       return v.args == null ? 0 : untyped __dollar__asize(v.args);
     #elseif flash9
       var pl : Array<Dynamic> = v.params;
       return pl == null ? 0 : pl.length;
-    #elseif cpp    
+    #elseif cpp
+
+    #if (haxe_ver >= 3.3)
+      var v:cpp.EnumBase = cast v;
+      var pl : Array<Dynamic> = v._hx_getParameters();
+      return pl == null ? 0 : pl.length;
+    #else
       var pl : Array<Dynamic> = v.__EnumParams();
       return pl == null ? 0 : pl.length;
-    #elseif php    
-      var l : Int = untyped __call__("count", v.params);   
+    #end
+
+    #elseif php
+      var l : Int = untyped __call__("count", v.params);
       return l == 0 || v.params == null ? 0 : l;
-    #elseif (java || cs)   
+    #elseif (java || cs)
       var arr:Array<Dynamic> = Type.enumParameters(v);
       return arr == null ? 0 : arr.length;
-    #else    
+    #else
       var l = v[untyped "length"];
       return l - 2;
     #end
