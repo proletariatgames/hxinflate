@@ -291,7 +291,7 @@ class Deflater {
       return new Deflater();
     }
   }
-  
+
   public static function getTypeInfoFromInflater(inflater:Inflater) {
     var deflater = new Deflater();
     var i_scache = inflater.scache;
@@ -360,7 +360,7 @@ class Deflater {
     if (deflater.tcount != inflater.tcache.length) {
       throw 'bad length';
     }
-    
+
     return deflater;
   }
 
@@ -670,6 +670,24 @@ class Deflater {
           serialize(p);
       }
       #elseif cpp
+
+      #if (haxe_ver >= 3.3)
+      var v:cpp.EnumBase = cast v;
+      if( useEnumIndex ) {
+        buf.add(":");
+        buf.add(v._hx_getIndex());
+      } else
+        serializeString(v._hx_getTag());
+      buf.add(":");
+      var pl : Array<Dynamic> = v._hx_getParameters();
+      if( pl == null )
+        buf.add(0);
+      else {
+        buf.add(pl.length);
+        for( p in pl )
+          serialize(p);
+      }
+      #else
       if( useEnumIndex ) {
         buf.add(":");
         buf.add(v.__Index());
@@ -684,6 +702,8 @@ class Deflater {
         for( p in pl )
           serialize(p);
       }
+      #end
+
       #elseif php
       if( useEnumIndex ) {
         buf.add(":");
