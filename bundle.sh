@@ -1,4 +1,3 @@
-(END)
 #!/bin/sh
 
 libname='hxInflate'

@@ -4,7 +4,7 @@
   "license": "BSD",
   "tags": ["serialization","loading","saving","storage","database","network"],
   "description": "Haxe Serialization Library",
-  "version": "0.2.5",
-  "releasenote": "Deflater.options keeps all additional options passed in to constructor",
+  "version": "0.3.0",
+  "releasenote": "haxe 3.3 / hxcpp compatibility",
   "contributors": ["Proletariat", "lpetre", "danogles"]
 }
