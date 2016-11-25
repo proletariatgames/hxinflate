@@ -27,7 +27,7 @@ var serializedObject:String = defl.toString();
 
 ```haxe
 var stm = new StringInflateStream(serializedObject);
-ar inf = new Inflater(stm);
+var inf = new Inflater(stm);
 var myObject:MyObjectType = inf.unserialize();
 ```
 
@@ -123,7 +123,7 @@ Later, it was decided to add an extra "xp" field to the class, and that there sh
   public var xp:Int;
 
   public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void {
-    if (version &lt; 1) {
+    if (version < 1) {
       // Add new fields to the map
       fieldsMap["name"] = fieldsMap["firstName"] + " " + fieldsMap["lastName"];
       fieldsMap["xp"] = 1;
@@ -168,7 +168,7 @@ Later, it was decided to add an extra "name" parameter to the Human type, and th
 ```haxe
 @version(1) @:keep class PVPOpponent_deflatable implements serialization.Deflatable {
   public static function _upgrade_enum(version:Int, , data:{constructor:String, params:Array<Dynamic>) : Void {
-    if (version &lt; 1) {
+    if (version < 1) {
       switch(data.constructor) {
       // rename the old constructor
       case 'AI': data.constructor = 'Computer';
