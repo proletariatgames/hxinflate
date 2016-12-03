@@ -99,7 +99,7 @@ All serialized class instances include a version number, which is zero (0) by de
 3. Add a static `_upgrade_version function`, with the following signature:
 
 ```haxe
-public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void;
+public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String, Dynamic>) : Void;
 ```
 
 - `instance` is the object being deserialized, *before* any fields have been written.
@@ -122,7 +122,7 @@ Later, it was decided to add an extra "xp" field to the class, and that there sh
   public var name:String;
   public var xp:Int;
 
-  public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String,Dynamic>) : Void {
+  public static function _upgrade_version(instance:Dynamic, version:Int, fieldsMap:Map<String, Dynamic>) : Void {
     if (version < 1) {
       // Add new fields to the map
       fieldsMap["name"] = fieldsMap["firstName"] + " " + fieldsMap["lastName"];
@@ -167,7 +167,7 @@ Later, it was decided to add an extra "name" parameter to the Human type, and th
 
 ```haxe
 @version(1) @:keep class PVPOpponent_deflatable implements serialization.Deflatable {
-  public static function _upgrade_enum(version:Int, , data:{constructor:String, params:Array<Dynamic>) : Void {
+  public static function _upgrade_enum(version:Int, data:{constructor:String, params:Array<Dynamic>) : Void {
     if (version < 1) {
       switch(data.constructor) {
       // rename the old constructor
@@ -212,7 +212,7 @@ The following function will serialize all objects in the input array separately,
 
 ```haxe
 // Serialize all input objects into separate streams, with a single type cache
-function deflateObjects(objs:Array<Dynamic> results:Array<String>) : String {
+function deflateObjects(objs:Array<Dynamic>, results:Array<String>) : String {
   // create the stream where all strings and type information will get written
   var typeCache = new Deflater();
 
