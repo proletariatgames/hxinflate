@@ -236,7 +236,7 @@ class Deflater {
         buf.add(x);
       #end
     }
-    inline function addStr(buf:StringBuf, x:String) {
+    inline function addRawStr(buf:StringBuf, x:String) {
       #if js
         untyped buf.b += x;
       #else
@@ -264,10 +264,11 @@ class Deflater {
       addInt(buf, td.scount);
       td.scount++;
 
-      td.buf.add("Y");
-      addInt(td.buf, s.length);
+      var encodedString = StringTools.urlEncode(s);
+      td.buf.add("y");
+      addInt(td.buf, encodedString.length);
       td.buf.add(":");
-      addStr(td.buf, s);
+      addRawStr(td.buf, encodedString);
     } else {
       var x = shash.get(s);
       if ( x != null ) {
@@ -275,10 +276,11 @@ class Deflater {
         addInt(buf, x);
       } else {
         shash.set(s,scount++);
-        buf.add("Y"); // denotes raw (not url-encoded) string
-        addInt(buf,s.length);
+        buf.add("y"); // TODO: use "Y" for raw (non-encoded) strings when possible
+        var encodedString = StringTools.urlEncode(s);
+        addInt(buf,encodedString.length);
         buf.add(":");
-        addStr(buf, s);
+        addRawStr(buf, encodedString);
       }
     }
   }
