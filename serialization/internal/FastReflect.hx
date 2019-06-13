@@ -40,7 +40,8 @@ class FastReflect
     var acc = 0; //alloc_int
     for (i in 0...s.length)
     {
-      acc = (( 223 * (acc >> 1) + s.charCodeAt(i) ) << 1);
+      var tmp:Int = 223 * (acc >> 1) + s.charCodeAt(i);
+      acc = ((tmp) << 1);
     }
 
     return acc >>> 1; //always positive
